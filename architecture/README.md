@@ -12,3 +12,4 @@ Per §9.1, this document links out; it does not duplicate.
 | [tool-cost-derivation.md](tool-cost-derivation.md) | §1, §3 | Accepted — fills a §2.1 gap |
 | [budget-scope-and-state.md](budget-scope-and-state.md) | §4, §5 | Accepted — fills a §4 gap |
 | [core-subpath-exports.md](core-subpath-exports.md) | §8.1 | Accepted — refines §8.1 |
+| [event-schema-completions.md](event-schema-completions.md) | §3 | Accepted — completes §3 |
