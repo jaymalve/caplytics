@@ -1,7 +1,7 @@
 # Per-call metadata travels via requestContext
 
 **Implements:** §6.1
-**Status:** Accepted in shape; **transport not yet functional** — see the open issue below
+**Status:** Accepted — amends §6.1
 
 ## Decision
 
@@ -29,29 +29,20 @@ Agent-level metadata (`caplytics.attach(agent, { metadata: { category: "..." } }
 
 The alternative — reaching Mastra's option types via declaration merging so `caplytics: {}` becomes legal — was rejected. It makes an SDK's type correctness depend on module augmentation resolving in the consumer's project, which fails silently under `skipLibCheck`, bundler re-exports, and monorepo hoisting. A wrong-looking API that always works beats a pretty one that intermittently does not.
 
-## OPEN: the transport does not currently reach the interception points
+## Resolved: the wrapper must be unwrapped before use
 
-The merge itself works and is tested — agent-level and run-level metadata reach every event, with
-the more specific level winning. What does not work is reading metadata (or run identity) off a
-caller-supplied `requestContext`.
+Mastra invokes a model resolver as `modelConfig({ requestContext, mastra })` — confirmed in
+`resolveModelSelection` in `@mastra/core@1.55.0`. The resolver therefore receives a **wrapper**, not
+the request context itself, and anything calling `.get()` on that wrapper finds nothing.
 
-What is known:
+`attach()` briefly passed the wrapper straight through to both interception points. The tool path
+was corrected; the model path was not, so run identity and per-call metadata could never be read
+from a caller-supplied context. Both now unwrap.
 
-- A **raw** agent's resolver receives `{ requestContext, mastra }`, and a caller-set entry is
-  readable from the inner `RequestContext` — verified directly.
-- With `attach()` installed, the resolver instead receives a plain object with no `requestContext`
-  property and no `get` method. Unwrapping therefore finds nothing.
-
-So something about assigning `agent.model` after construction changes what Mastra passes the
-resolver. This has been latent since PR 7: every test until now exercised the `AsyncLocalStorage`
-rung of the ladder, which works, so the `requestContext` rung was never covered.
-
-**Impact.** `caplytics.run()` is currently the only working way to scope a run or attach per-call
-metadata. `caplytics.context()` builds a correct `RequestContext` — its contents read back fine in
-isolation — but nothing downstream can see it. The fallback warning fires, so no caller is silently
-misled; they are told per-run caps are not being enforced.
-
-This needs isolating against Mastra's model-resolution path rather than patching by guesswork.
+This was latent from PR 7 until PR 12 because every test until then used the `AsyncLocalStorage`
+rung of the run-identity ladder, which works regardless. The first test to exercise the
+`requestContext` rung found it immediately — a reminder that a resolution ladder needs a test per
+rung, not one test that happens to take the first branch.
 
 ## Consequences
 

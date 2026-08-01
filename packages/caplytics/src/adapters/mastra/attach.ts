@@ -94,7 +94,7 @@ export function attach<T extends AnyAgent>(
     // A fresh proxy per resolution, so the closure holds this call's request context.
     return proxyResolvedModel(
       resolved,
-      modelHooks({ budgetKey, requestContext: context }, hooks),
+      modelHooks({ budgetKey, requestContext: unwrapRequestContext(context) }, hooks),
     ) as never;
   };
 

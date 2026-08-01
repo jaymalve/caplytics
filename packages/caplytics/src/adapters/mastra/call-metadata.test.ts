@@ -103,10 +103,6 @@ describe("readCallMetadata", () => {
   });
 });
 
-/**
- * Per-call metadata via `requestContext` is covered only at the unit level for now — the transport
- * itself is not yet functional. See architecture/per-call-metadata-transport.md.
- */
 describe("metadata reaches the event", () => {
   test("agent-level metadata is attached to every call", async () => {
     const { instance, events } = await setup();
@@ -124,6 +120,34 @@ describe("metadata reaches the event", () => {
     await instance.run(() => agent.generate("hi"), { metadata: { customerId: "cus_1" } });
 
     expect(events[0]?.metadata).toEqual({ category: "support", customerId: "cus_1" });
+  });
+
+  // §6.1's worked example: an agent-level default plus per-call business data.
+  test("per-call metadata merges over both", async () => {
+    const { instance, events } = await setup();
+    const agent = instance.attach(buildAgent(), { metadata: { category: "customer-support" } });
+
+    await agent.generate("hi", {
+      requestContext: instance.context({ customerId: "cus_18213", channel: "chat" }),
+    } as never);
+
+    expect(events[0]?.metadata).toEqual({
+      category: "customer-support",
+      customerId: "cus_18213",
+      channel: "chat",
+    });
+  });
+
+  // The context carries run identity too, so passing it groups calls without run().
+  test("a caller-supplied context scopes the run as well", async () => {
+    const { instance, events } = await setup();
+    const agent = instance.attach(buildAgent());
+    const context = instance.context({ customerId: "cus_1" });
+
+    await agent.generate("one", { requestContext: context } as never);
+    await agent.generate("two", { requestContext: context } as never);
+
+    expect(new Set(events.map((event) => event.runId)).size).toBe(1);
   });
 
   test("a call with no metadata anywhere records an empty object, not undefined", async () => {
