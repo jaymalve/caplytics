@@ -2,6 +2,10 @@
 // architecture/core-subpath-exports.md — persistence lives at `@caplytics/core/postgres`.
 
 export {
+  type BudgetExceededDetails,
+  CaplyticsBudgetExceededError,
+} from "./budget/budget-exceeded-error.js";
+export {
   type BudgetScope,
   type BudgetState,
   budgetRemaining,
@@ -14,6 +18,12 @@ export {
   createInMemoryBudgetStore,
   type InMemoryBudgetStoreOptions,
 } from "./budget/in-memory-budget-store.js";
+export {
+  decideLimit,
+  isExhausted,
+  type LimitAction,
+  type LimitPolicy,
+} from "./budget/limit-decision.js";
 export {
   type CaplyticsEvent,
   type CaplyticsEventType,

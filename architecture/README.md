@@ -15,3 +15,4 @@ Per §9.1, this document links out; it does not duplicate.
 | [event-schema-completions.md](event-schema-completions.md) | §3 | Accepted — completes §3 |
 | [pricing-data-source.md](pricing-data-source.md) | §3 | Accepted — supersedes the hand-written rate table |
 | [mastra-internal-api-coupling.md](mastra-internal-api-coupling.md) | §1 | Accepted |
+| [run-scoping-api.md](run-scoping-api.md) | §1, §4 | Accepted — adds public API |

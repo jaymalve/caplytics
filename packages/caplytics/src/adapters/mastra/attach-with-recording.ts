@@ -1,6 +1,12 @@
 import {
+  type BudgetScope,
   type BudgetStore,
+  budgetSpent,
+  CaplyticsBudgetExceededError,
   type CaplyticsEvent,
+  decideLimit,
+  formatUsd,
+  type LimitPolicy,
   type MicroDollars,
   type PriceTable,
   usdToMicroDollars,
@@ -40,16 +46,58 @@ export function attachWithRecording<T extends AnyAgent>(
   // the start is carried forward rather than resolved twice — a second resolution could land in a
   // different async context and split one call across two runs.
   let pending: RecordedCall | undefined;
+  let pendingTool: RecordedCall | undefined;
+
+  const policy: LimitPolicy = config.onLimit ?? "warn";
+  const warnedRuns = new Set<string>();
+
+  /**
+   * The §4.1 check, run before the call fires.
+   *
+   * Throwing from a start hook aborts the call: both hooks are invoked outside the wrapper's
+   * try/catch, so the error propagates out of `doGenerate` / `execute` as an ordinary failure and
+   * Mastra's loop needs no special handling.
+   */
+  function enforceBefore(requestContext: unknown): RecordedCall {
+    const call: RecordedCall = {
+      runId: resolveRun(requestContext).runId,
+      agentId,
+      budgetKey,
+      cap,
+      metadata: { ...config.metadata },
+    };
+
+    const scope: BudgetScope = { runId: call.runId, budgetKey };
+    const state = deps.store.open(scope, cap);
+    const action = decideLimit(state, policy);
+
+    if (action === "block") {
+      throw new CaplyticsBudgetExceededError({
+        runId: call.runId,
+        budget: budgetKey,
+        spent: budgetSpent(state),
+        // `cap` is non-null here: decideLimit only blocks a capped run.
+        cap: state.cap ?? cap ?? budgetSpent(state),
+      });
+    }
+
+    // Once per run, not once per call: a run that keeps going past its cap would otherwise emit a
+    // warning for every remaining call and bury the one that mattered.
+    if (action === "warn" && !warnedRuns.has(call.runId)) {
+      warnedRuns.add(call.runId);
+      console.warn(
+        `[caplytics] budget "${budgetKey}" exhausted — spent ${formatUsd(budgetSpent(state))} ` +
+          `of ${formatUsd(state.cap ?? budgetSpent(state))} (run ${call.runId}). ` +
+          'Calls continue because onLimit is "warn"; set onLimit: "block" to stop them.',
+      );
+    }
+
+    return call;
+  }
 
   return attach(agent, config, {
     onModelCall: ({ scope }) => {
-      pending = {
-        runId: resolveRun(scope.requestContext).runId,
-        agentId,
-        budgetKey,
-        cap,
-        metadata: { ...config.metadata },
-      };
+      pending = enforceBefore(scope.requestContext);
     },
     onModelResult: ({ modelId, result }) => {
       const usage = usageFromResult(result);
@@ -61,21 +109,16 @@ export function attachWithRecording<T extends AnyAgent>(
 
       recorder.modelCall(call, modelId, usage);
     },
-    onToolResult: ({ scope, toolName, result }) => {
+    onToolCall: ({ scope }) => {
+      pendingTool = enforceBefore(scope.requestContext);
+    },
+    onToolResult: ({ toolName, result }) => {
       const declared = config.tools?.[toolName as keyof typeof config.tools]?.cost;
+      const call = pendingTool;
+      pendingTool = undefined;
+      if (call === undefined) return;
 
-      recorder.toolCall(
-        {
-          runId: resolveRun(scope.requestContext).runId,
-          agentId,
-          budgetKey,
-          cap,
-          metadata: { ...config.metadata },
-        },
-        toolName,
-        result,
-        declared,
-      );
+      recorder.toolCall(call, toolName, result, declared);
     },
   });
 }
