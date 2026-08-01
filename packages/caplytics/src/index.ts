@@ -1,3 +1,15 @@
+export type {
+  AnyAgent,
+  CaplyticsConfig,
+  ToolBudget,
+  ToolNames,
+} from "./adapters/mastra/agent-types.js";
+export {
+  type AttachHooks,
+  attach,
+  budgetKeyFor,
+  type InterceptionScope,
+} from "./adapters/mastra/attach.js";
 export {
   type Caplytics,
   type CaplyticsOptions,
@@ -12,6 +24,7 @@ export {
   type EventBusOptions,
   type Unsubscribe,
 } from "./events/event-bus.js";
+export { type ModelCallHooks, proxyLanguageModel } from "./model/proxy-language-model.js";
 export {
   createLiteLlmPriceSource,
   type LiteLlmPriceSourceOptions,

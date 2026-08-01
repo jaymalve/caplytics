@@ -22,7 +22,7 @@
     "@caplytics/core": "workspace:*"
   },
   "peerDependencies": {
-    "@mastra/core": ">=1.55.0"
+    "@mastra/core": "^1.55.0"
   },
   "peerDependenciesMeta": {
     "@mastra/core": {
@@ -31,5 +31,9 @@
   },
   "engines": {
     "node": ">=20"
+  },
+  "devDependencies": {
+    "@mastra/core": "^1.55.0",
+    "zod": "^4.4.3"
   }
 }
