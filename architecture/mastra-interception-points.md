@@ -28,7 +28,38 @@ class Agent<
 
 The constraint must be written `Agent<any, any, any, any, any>` — five slots, not three.
 
-### Model resolver is invoked per model call (critical)
+### CORRECTION: the model resolver is NOT invoked per model call
+
+The finding below is wrong, and the error was a coincidence in the probe that produced it.
+
+Re-probed with varying step counts:
+
+| Steps in the run | Resolver invocations | `doGenerate` calls |
+|---|---|---|
+| 2 | 2 | 2 |
+| 4 | 2 | 4 |
+| 6 | 2 | 5 |
+
+Mastra resolves the model **twice per `.generate()`, both times before the first model call**, and
+every subsequent call reuses the instance from the second resolution. The original probe ran a
+two-step loop, saw 2 resolutions against 2 calls, and read 1:1 where there was none.
+
+**Consequence for §5.** A degradation ladder evaluated in the resolver would run once, at the start
+of the run, when nothing has been spent — and never again. §5's requirement that the ladder be
+"re-resolved on every call" is not satisfiable at the resolver.
+
+**Where the per-call seam actually is: the proxy.** `doGenerate` / `doStream` are intercepted on
+every model call, because the proxy wraps the instance that gets reused. So the ladder belongs
+inside the proxy, choosing its delegate per call, rather than in the resolver choosing a model per
+resolution. This is a stronger version of what
+[model-proxy-over-string-swap.md](model-proxy-over-string-swap.md) already argued: the proxy is not
+merely a convenient place to observe calls, it is the only place that sees each one.
+
+§1's description of the mechanism — "replaces the model string with a resolver function invoked on
+every call" — is therefore inaccurate for Mastra. The interception *point* is unchanged; what fires
+per call is the proxy the resolver returns, not the resolver itself.
+
+### Superseded: model resolver is invoked per model call
 
 `model` accepts `DynamicArgument<MastraModelConfig, TRequestContext>`, i.e.
 `T | (({ requestContext, mastra }) => T | Promise<T>)`.

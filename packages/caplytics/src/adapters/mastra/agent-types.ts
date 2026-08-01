@@ -1,3 +1,4 @@
+import type { DegradeLadder } from "@caplytics/core";
 import type { Agent } from "@mastra/core/agent";
 
 /**
@@ -40,6 +41,11 @@ export type CaplyticsConfig<T> = {
   budget?: string;
   cap?: number | "unlimited";
   onLimit?: "warn" | "block" | "degrade";
+  /**
+   * §5's ladder, consulted before every model call. Rejected at attach time if it leaves no
+   * headroom before the budget blocks (§5.1).
+   */
+  degrade?: DegradeLadder;
   tools?: Partial<Record<ToolNames<T>, ToolBudget>>;
   metadata?: Record<string, string>;
 };

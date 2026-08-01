@@ -1,7 +1,9 @@
 import {
+  assertValidLadder,
   type BudgetScope,
   type BudgetStore,
   budgetSpent,
+  budgetUsedFraction,
   CaplyticsBudgetExceededError,
   type CaplyticsEvent,
   decideLimit,
@@ -9,8 +11,11 @@ import {
   type LimitPolicy,
   type MicroDollars,
   type PriceTable,
+  resolveRung,
   usdToMicroDollars,
 } from "@caplytics/core";
+import { ModelRouterLanguageModel } from "@mastra/core/llm";
+import type { CallSelection } from "../../model/proxy-language-model.js";
 import { createSpendRecorder, type RecordedCall } from "../../spend/spend-recorder.js";
 import type { AnyAgent, CaplyticsConfig } from "./agent-types.js";
 import { attach, budgetKeyFor } from "./attach.js";
@@ -49,7 +54,36 @@ export function attachWithRecording<T extends AnyAgent>(
   let pendingTool: RecordedCall | undefined;
 
   const policy: LimitPolicy = config.onLimit ?? "warn";
+  const ladder = config.degrade ?? [];
+  // §5.1: an unworkable ladder is a startup error, not a surprise on the call where it flaps.
+  assertValidLadder(ladder, policy === "block");
   const warnedRuns = new Set<string>();
+
+  // Substitute models are built once and reused; constructing a router per call would pay setup
+  // costs on exactly the calls the ladder is trying to make cheaper.
+  const substitutes = new Map<string, object>();
+  function substituteFor(modelId: string): object {
+    const existing = substitutes.get(modelId);
+    if (existing !== undefined) return existing;
+
+    const built = new ModelRouterLanguageModel(modelId as never);
+    substitutes.set(modelId, built);
+    return built;
+  }
+
+  /** §5, evaluated per model call — the proxy is the only seam that sees each one. */
+  function selectForCall(requestContext: unknown): CallSelection | undefined {
+    if (ladder.length === 0) return undefined;
+
+    const runId = resolveRun(requestContext).runId;
+    const state = deps.store.open({ runId, budgetKey }, cap);
+    const rung = resolveRung(budgetUsedFraction(state), ladder);
+    if (rung === undefined) return undefined;
+
+    return "model" in rung
+      ? { model: substituteFor(rung.model) }
+      : { maxOutputTokens: rung.maxTokens };
+  }
 
   /**
    * The §4.1 check, run before the call fires.
@@ -96,6 +130,7 @@ export function attachWithRecording<T extends AnyAgent>(
   }
 
   return attach(agent, config, {
+    selectForCall: ({ scope }) => selectForCall(scope.requestContext),
     onModelCall: ({ scope }) => {
       pending = enforceBefore(scope.requestContext);
     },
