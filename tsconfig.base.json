@@ -1,0 +1,34 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2023"],
+    "module": "Preserve",
+    "moduleResolution": "bundler",
+    "moduleDetection": "force",
+    "types": ["bun"],
+
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+
+    // Typecheck resolves workspace imports to source, so no package needs building before
+    // another can be checked. Bundlers and Node resolve the real `exports` map at build time.
+    "baseUrl": ".",
+    "paths": {
+      "@caplytics/core": ["packages/core/src/index.ts"],
+      "@caplytics/core/postgres": ["packages/core/src/postgres/index.ts"]
+    }
+  }
+}
