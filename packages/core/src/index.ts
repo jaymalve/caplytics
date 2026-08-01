@@ -18,3 +18,25 @@ export {
   usdToMicroDollars,
   ZERO_MICRO_DOLLARS,
 } from "./money/micro-dollars.js";
+export { estimateTokenCount } from "./pricing/estimate-token-count.js";
+export {
+  findModelRates,
+  normaliseModelId,
+  pricedModelIds,
+} from "./pricing/model-price-registry.js";
+export {
+  anthropicRates,
+  type MicroDollarsPerMillionTokens,
+  type ModelRates,
+  microDollarsPerMillionTokensSchema,
+  TOKENS_PER_MILLION,
+  usdPerMillionTokens,
+} from "./pricing/model-rates.js";
+export { type PricedCall, priceModelCall, priceUsage } from "./pricing/price-model-call.js";
+export { priceToolResult, type ToolResultPricing } from "./pricing/price-tool-result.js";
+export {
+  type TokenUsage,
+  tokenUsageSchema,
+  totalInputTokens,
+  ZERO_TOKEN_USAGE,
+} from "./pricing/token-usage.js";
