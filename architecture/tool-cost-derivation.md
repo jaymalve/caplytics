@@ -1,7 +1,32 @@
-# Tool cost is derived from tokens, not hardcoded
+# Tool cost is declared external cost; result tokens are attribution only
 
 **Implements:** §1, §3
-**Status:** Accepted — fills a gap in §2.1
+**Status:** Superseded in part by the correction below — the derivation double-counted
+
+## Correction (PR 7): the derived token cost must not consume budget
+
+The design below charged a tool for the tokens its result adds to context. That double-counts.
+
+Those same tokens are billed by the provider as **input on the following model call**, which
+caplytics already prices in full from real usage. Charging them again on the tool event would make
+total recorded spend exceed the provider's invoice — the one thing a cost tracker must never do,
+and a direct violation of §4.2's rule against false precision.
+
+What ships instead:
+
+- **Model calls carry the full provider cost.** Nothing is netted out of them, so a caplytics event
+  and the provider's own usage figures agree for that call.
+- **Tool calls consume budget only for `cost`** — external pricing (a paid API, a payment moved)
+  that no instrumentation can observe and that the provider never bills.
+- **Result tokens are reported on the tool event's `tokensIn`**, for attribution rather than
+  charge. A chatty tool is still visible, and still caught by enforcement — its payload inflates the
+  model call that reads it, where the money is actually spent.
+
+The estimate/reconcile machinery below is therefore unnecessary: there is nothing to reconcile once
+tool token cost is not a charge. `priceToolResult` was removed and replaced by `toolResultTokens`.
+
+The rationale for *deriving* rather than hardcoding still stands — it is the accounting that moved,
+not the measurement.
 
 ## Decision
 

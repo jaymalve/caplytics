@@ -1,4 +1,13 @@
-import type { CaplyticsEvent } from "@caplytics/core";
+import {
+  type BudgetStore,
+  type CaplyticsEvent,
+  createInMemoryBudgetStore,
+  EMPTY_PRICE_TABLE,
+  type PriceTable,
+} from "@caplytics/core";
+import type { AnyAgent, CaplyticsConfig } from "./adapters/mastra/agent-types.js";
+import { attachWithRecording } from "./adapters/mastra/attach-with-recording.js";
+import { RUN_ID_CONTEXT_KEY } from "./adapters/mastra/run-identity.js";
 import { type AgentMonitor, createAgentMonitor } from "./events/agent-monitor.js";
 import {
   type CaplyticsEventHandler,
@@ -6,8 +15,14 @@ import {
   type EventBusOptions,
   type Unsubscribe,
 } from "./events/event-bus.js";
+import { createLiteLlmPriceSource } from "./pricing/litellm-price-source.js";
+import type { PriceSource } from "./pricing/price-source.js";
+import { newRunId, type RunContext, withRun } from "./run/run-context.js";
 
-export type CaplyticsOptions = EventBusOptions;
+export type CaplyticsOptions = EventBusOptions & {
+  store?: BudgetStore;
+  priceSource?: PriceSource;
+};
 
 /**
  * The SDK's entry point: subscription lives here, not on agent instances (§3).
@@ -27,10 +42,33 @@ export type Caplytics = {
 
   /** @internal Introspection for tests and diagnostics. */
   listenerCount(budgetKey: string): number;
+
+  /** Installs the interception points on an agent and returns it unchanged (§1). */
+  attach<T extends AnyAgent>(agent: T, config?: CaplyticsConfig<T>): T;
+
+  /**
+   * Groups everything called inside into one run, so a per-run cap has something to bound.
+   *
+   * Needed because §1 allows no interception point that could bracket `.generate()` — see
+   * adapters/mastra/run-identity.ts.
+   */
+  run<T>(fn: () => T, options?: { metadata?: Record<string, string> }): T;
+
+  /** Entries to pass as `requestContext`, for callers who cannot wrap with `run()`. */
+  context(metadata?: Record<string, string>): Map<string, string>;
+
+  /** Loads pricing. Awaited once before the first priced call so a run never starts unpriced. */
+  warmPricing(): Promise<PriceTable>;
 };
 
 export function createCaplytics(options: CaplyticsOptions = {}): Caplytics {
   const bus = createEventBus(options);
+  const store = options.store ?? createInMemoryBudgetStore();
+  const priceSource = options.priceSource ?? createLiteLlmPriceSource();
+
+  // Held synchronously because pricing sits in the hot path; `warmPricing()` populates it, and an
+  // unpriced call reports priceUnknown rather than blocking the agent.
+  let table: PriceTable = EMPTY_PRICE_TABLE;
 
   return {
     on: (budgetKey, handler) => bus.on(budgetKey, handler),
@@ -39,6 +77,34 @@ export function createCaplytics(options: CaplyticsOptions = {}): Caplytics {
       bus.emit(budgetKey, event);
     },
     listenerCount: (budgetKey) => bus.listenerCount(budgetKey),
+
+    attach: (agent, config = {}) =>
+      attachWithRecording(agent, config, {
+        store,
+        table: () => table,
+        emit: (budgetKey, event) => bus.emit(budgetKey, event),
+      }),
+
+    run: (fn, runOptions = {}) => {
+      const context: RunContext = {
+        runId: newRunId(),
+        budgetKey: "",
+        metadata: runOptions.metadata ?? {},
+        startedAt: new Date().toISOString(),
+      };
+      return withRun(context, fn);
+    },
+
+    context: (metadata = {}) => {
+      const entries = new Map<string, string>(Object.entries(metadata));
+      entries.set(RUN_ID_CONTEXT_KEY, newRunId());
+      return entries;
+    },
+
+    warmPricing: async () => {
+      table = await priceSource.load();
+      return table;
+    },
   };
 }
 

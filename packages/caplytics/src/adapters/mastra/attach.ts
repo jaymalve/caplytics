@@ -12,6 +12,11 @@ import { type ToolExecutionHooks, wrapToolMap } from "./wrap-tool-map.js";
  */
 export type InterceptionScope = {
   readonly budgetKey: string;
+  /**
+   * Mastra's request context for this call. Carried because run identity may ride on it — the
+   * resolver has no other way to learn which run it belongs to (see run-identity.ts).
+   */
+  readonly requestContext: unknown;
 };
 
 export type AttachHooks = {
@@ -59,7 +64,7 @@ export function attach<T extends AnyAgent>(
   config: CaplyticsConfig<T> = {},
   hooks: AttachHooks = {},
 ): T {
-  const scope: InterceptionScope = { budgetKey: budgetKeyFor(agent, config) };
+  const budgetKey = budgetKeyFor(agent, config);
 
   // Read before installing anything: both resolvers close over the originals, and reading them
   // afterwards would resolve caplytics' own wrappers and recurse.
@@ -68,12 +73,16 @@ export function attach<T extends AnyAgent>(
 
   agent.model = async (context: unknown) => {
     const resolved = await resolveDynamic<unknown>(originalModel, context);
-    return proxyResolvedModel(resolved, modelHooks(scope, hooks)) as never;
+    // A fresh proxy per resolution, so the closure holds this call's request context.
+    return proxyResolvedModel(
+      resolved,
+      modelHooks({ budgetKey, requestContext: context }, hooks),
+    ) as never;
   };
 
   tools.install(async (context) => {
     const resolved = await resolveDynamic<Record<string, unknown>>(tools.original, context);
-    return wrapToolMap(resolved, toolHooks(scope, hooks));
+    return wrapToolMap(resolved, toolHooks({ budgetKey, requestContext: context }, hooks));
   });
 
   return agent;
