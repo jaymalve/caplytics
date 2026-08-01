@@ -19,20 +19,22 @@ export {
   ZERO_MICRO_DOLLARS,
 } from "./money/micro-dollars.js";
 export { estimateTokenCount } from "./pricing/estimate-token-count.js";
+export { type PriceTableSource, toPriceTable } from "./pricing/litellm-pricing.js";
 export {
-  findModelRates,
-  normaliseModelId,
-  pricedModelIds,
-} from "./pricing/model-price-registry.js";
-export {
-  anthropicRates,
   type MicroDollarsPerMillionTokens,
   type ModelRates,
   microDollarsPerMillionTokensSchema,
   TOKENS_PER_MILLION,
   usdPerMillionTokens,
+  usdPerTokenToRate,
 } from "./pricing/model-rates.js";
 export { type PricedCall, priceModelCall, priceUsage } from "./pricing/price-model-call.js";
+export {
+  EMPTY_PRICE_TABLE,
+  findModelRates,
+  modelIdCandidates,
+  type PriceTable,
+} from "./pricing/price-table.js";
 export { priceToolResult, type ToolResultPricing } from "./pricing/price-tool-result.js";
 export {
   type TokenUsage,

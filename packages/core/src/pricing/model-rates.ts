@@ -20,6 +20,15 @@ export function usdPerMillionTokens(usd: number): MicroDollarsPerMillionTokens {
   return microDollarsPerMillionTokensSchema.parse(Math.round(usd * 1_000_000));
 }
 
+/**
+ * Pricing feeds quote dollars per single token, as floats small enough to carry visible binary
+ * error (a $0.20/M cache read arrives as 1.9999999999999998e-7). Scaling to integer micro-dollars
+ * per million and rounding once is what stops that error reaching the ledger.
+ */
+export function usdPerTokenToRate(usdPerToken: number): MicroDollarsPerMillionTokens {
+  return microDollarsPerMillionTokensSchema.parse(Math.round(usdPerToken * 1e12));
+}
+
 export type ModelRates = {
   uncachedInput: MicroDollarsPerMillionTokens;
   cacheReadInput: MicroDollarsPerMillionTokens;
@@ -27,22 +36,3 @@ export type ModelRates = {
   cacheWrite1hInput: MicroDollarsPerMillionTokens;
   output: MicroDollarsPerMillionTokens;
 };
-
-/**
- * Anthropic prices cache traffic as fixed multiples of a model's input rate, so the registry states
- * the two published numbers and derives the rest. Naming the vendor is the point: these multipliers
- * are not universal, and a future provider's table must not inherit them by looking similar.
- */
-const CACHE_READ_MULTIPLIER = 0.1;
-const CACHE_WRITE_5M_MULTIPLIER = 1.25;
-const CACHE_WRITE_1H_MULTIPLIER = 2;
-
-export function anthropicRates(inputUsd: number, outputUsd: number): ModelRates {
-  return {
-    uncachedInput: usdPerMillionTokens(inputUsd),
-    cacheReadInput: usdPerMillionTokens(inputUsd * CACHE_READ_MULTIPLIER),
-    cacheWrite5mInput: usdPerMillionTokens(inputUsd * CACHE_WRITE_5M_MULTIPLIER),
-    cacheWrite1hInput: usdPerMillionTokens(inputUsd * CACHE_WRITE_1H_MULTIPLIER),
-    output: usdPerMillionTokens(outputUsd),
-  };
-}

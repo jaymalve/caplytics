@@ -1,16 +1,14 @@
 import { type MicroDollars, sumMicroDollars, ZERO_MICRO_DOLLARS } from "../money/micro-dollars.js";
 import { estimateTokenCount } from "./estimate-token-count.js";
-import { findModelRates } from "./model-price-registry.js";
-import { TOKENS_PER_MILLION } from "./model-rates.js";
+import { type ModelRates, TOKENS_PER_MILLION } from "./model-rates.js";
 import type { PricedCall } from "./price-model-call.js";
 
 export type ToolResultPricing = {
   result: unknown;
-  /** The model whose next turn will read this result as input tokens. */
-  parentModelId: string;
+  /** Rates for the model whose next turn will read this result as input tokens. */
+  parentRates: ModelRates | undefined;
   /** External per-call price (a paid API, a payment moved) that no instrumentation can observe. */
   declaredCost?: MicroDollars;
-  at: string;
 };
 
 /**
@@ -23,19 +21,19 @@ export type ToolResultPricing = {
  */
 export function priceToolResult({
   result,
-  parentModelId,
+  parentRates,
   declaredCost,
-  at,
 }: ToolResultPricing): PricedCall {
   const serialised = serialise(result);
-  const rates = findModelRates(parentModelId, at);
 
-  if (serialised === undefined || rates === undefined) {
+  if (serialised === undefined || parentRates === undefined) {
     return { cost: declaredCost ?? ZERO_MICRO_DOLLARS, priceUnknown: true };
   }
 
   const tokens = estimateTokenCount(serialised);
-  const tokenCost = Math.round((tokens * rates.uncachedInput) / TOKENS_PER_MILLION) as MicroDollars;
+  const tokenCost = Math.round(
+    (tokens * parentRates.uncachedInput) / TOKENS_PER_MILLION,
+  ) as MicroDollars;
 
   return {
     cost: sumMicroDollars(tokenCost, declaredCost ?? ZERO_MICRO_DOLLARS),

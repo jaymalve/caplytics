@@ -1,5 +1,4 @@
 import { type MicroDollars, sumMicroDollars, ZERO_MICRO_DOLLARS } from "../money/micro-dollars.js";
-import { findModelRates } from "./model-price-registry.js";
 import {
   type MicroDollarsPerMillionTokens,
   type ModelRates,
@@ -16,11 +15,14 @@ export type PricedCall = {
 /**
  * Prices one model call from its token usage.
  *
- * An unrecognised model yields zero cost with `priceUnknown: true` rather than a guess — the caller
- * records the call but does not deduct it from a budget, since there is no honest amount to deduct.
+ * Takes already-resolved rates rather than a model id so that pricing stays pure and synchronous:
+ * looking rates up means consulting a table that was fetched over the network, and that I/O belongs
+ * at the edge, not inside the arithmetic the budget ledger depends on.
+ *
+ * Absent rates yield zero cost with `priceUnknown: true` rather than a guess — the caller records
+ * the call but deducts nothing from the budget, since there is no honest amount to deduct.
  */
-export function priceModelCall(modelId: string, usage: TokenUsage, at: string): PricedCall {
-  const rates = findModelRates(modelId, at);
+export function priceModelCall(rates: ModelRates | undefined, usage: TokenUsage): PricedCall {
   if (rates === undefined) {
     return { cost: ZERO_MICRO_DOLLARS, priceUnknown: true };
   }
