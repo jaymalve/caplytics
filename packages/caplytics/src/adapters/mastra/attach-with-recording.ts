@@ -7,12 +7,15 @@ import {
   CaplyticsBudgetExceededError,
   type CaplyticsEvent,
   decideLimit,
+  findModelRates,
   formatUsd,
   type LimitPolicy,
   type MicroDollars,
   type PriceTable,
+  priceModelCall,
   resolveRung,
   usdToMicroDollars,
+  ZERO_TOKEN_USAGE,
 } from "@caplytics/core";
 import { ModelRouterLanguageModel } from "@mastra/core/llm";
 import type { CallSelection } from "../../model/proxy-language-model.js";
@@ -69,6 +72,37 @@ export function attachWithRecording<T extends AnyAgent>(
     const built = new ModelRouterLanguageModel(modelId as never);
     substitutes.set(modelId, built);
     return built;
+  }
+
+  /**
+   * §4.2's mid-stream stop.
+   *
+   * A single long `.stream()` call can cross the cap without ever reaching a call boundary, which
+   * is where §4.1's check lives. This projects the cost of what has streamed so far and stops once
+   * it would take the run past its cap.
+   *
+   * Only under `block`: a soft policy must not kill a stream in flight.
+   */
+  function streamProgress(
+    requestContext: unknown,
+    modelId: string,
+    estimatedOutputTokens: number,
+  ): "continue" | "abort" {
+    if (policy !== "block" || cap === null) return "continue";
+
+    const rates = findModelRates(deps.table(), modelId);
+    if (rates === undefined) return "continue";
+
+    const runId = resolveRun(requestContext).runId;
+    const state = deps.store.open({ runId, budgetKey }, cap);
+
+    const projected = priceModelCall(rates, {
+      ...ZERO_TOKEN_USAGE,
+      output: estimatedOutputTokens,
+    });
+    const wouldSpend = Number(budgetSpent(state)) + Number(projected.cost);
+
+    return wouldSpend > Number(cap) ? "abort" : "continue";
   }
 
   /** §5, evaluated per model call — the proxy is the only seam that sees each one. */
@@ -131,6 +165,8 @@ export function attachWithRecording<T extends AnyAgent>(
 
   return attach(agent, config, {
     selectForCall: ({ scope }) => selectForCall(scope.requestContext),
+    onStreamProgress: ({ scope, modelId, estimatedOutputTokens }) =>
+      streamProgress(scope.requestContext, modelId, estimatedOutputTokens),
     onModelCall: ({ scope }) => {
       pending = enforceBefore(scope.requestContext);
     },

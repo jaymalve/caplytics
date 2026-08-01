@@ -1,3 +1,5 @@
+import { estimateTokenCount } from "@caplytics/core";
+
 export type ModelCallHooks = {
   onCallStart?: (info: {
     readonly modelId: string;
@@ -18,6 +20,18 @@ export type ModelCallHooks = {
    * architecture/mastra-interception-points.md.
    */
   selectForCall?: () => CallSelection | undefined;
+
+  /**
+   * Consulted as a stream produces output, with tokens estimated from the text seen so far.
+   *
+   * Returning "abort" cancels the provider call (§4.2). Best effort by construction: tokens already
+   * streamed are billed and unrecoverable, so this stops as fast as possible rather than
+   * guaranteeing zero overage.
+   */
+  onStreamProgress?: (info: {
+    readonly modelId: string;
+    readonly estimatedOutputTokens: number;
+  }) => "continue" | "abort";
 };
 
 export type CallSelection = {
@@ -94,12 +108,23 @@ function intercepted(
           throw new TypeError(`caplytics: substituted model has no ${method}`);
         }
 
-        const result: unknown = await call.apply(
-          delegate,
+        // The proxy owns the controller because `abortSignal` on Mastra's execution options is
+        // supplied by the caller, and attach() does not control call sites. Injecting it here keeps
+        // §1's two interception points intact.
+        const aborter = new AbortController();
+        const withSignal = withAbortSignal(
           clampOutput(args, selection?.maxOutputTokens),
+          aborter.signal,
         );
-        hooks.onCallFinish?.({ modelId, method, result });
-        return result;
+
+        const result: unknown = await call.apply(delegate, withSignal);
+        const guarded =
+          method === "doStream" && hooks.onStreamProgress !== undefined
+            ? guardStream(result, aborter, modelId, hooks.onStreamProgress)
+            : result;
+
+        hooks.onCallFinish?.({ modelId, method, result: guarded });
+        return guarded;
       } catch (error) {
         hooks.onCallError?.({ modelId, error });
         throw error;
@@ -131,6 +156,75 @@ function clampOutput(args: unknown[], limit: number | undefined): unknown[] {
   const effective = typeof requested === "number" ? Math.min(requested, limit) : limit;
 
   return [{ ...options, maxOutputTokens: effective }, ...rest];
+}
+
+/** Combines with any signal the caller already passed, rather than replacing it. */
+function withAbortSignal(args: unknown[], signal: AbortSignal): unknown[] {
+  const [options, ...rest] = args;
+  if (typeof options !== "object" || options === null) return args;
+
+  const existing = Reflect.get(options, "abortSignal");
+  const combined = existing instanceof AbortSignal ? AbortSignal.any([existing, signal]) : signal;
+
+  return [{ ...options, abortSignal: combined }, ...rest];
+}
+
+/**
+ * Counts output as it streams and cancels the provider call once the guard says to.
+ *
+ * Tokens are estimated from accumulated text: providers report usage only in the terminating chunk,
+ * which arrives far too late to act on.
+ */
+function guardStream(
+  result: unknown,
+  aborter: AbortController,
+  modelId: string,
+  onStreamProgress: NonNullable<ModelCallHooks["onStreamProgress"]>,
+): unknown {
+  if (typeof result !== "object" || result === null) return result;
+
+  const stream = Reflect.get(result, "stream");
+  if (!(stream instanceof ReadableStream)) return result;
+
+  let text = "";
+  let aborted = false;
+
+  const guarded = stream.pipeThrough(
+    new TransformStream({
+      transform(part: unknown, controller) {
+        controller.enqueue(part);
+        if (aborted) return;
+
+        const delta = textDeltaOf(part);
+        if (delta === undefined) return;
+
+        text += delta;
+        if (
+          onStreamProgress({ modelId, estimatedOutputTokens: estimateTokenCount(text) }) !== "abort"
+        ) {
+          return;
+        }
+
+        aborted = true;
+        aborter.abort();
+        controller.terminate();
+      },
+    }),
+  );
+
+  return { ...result, stream: guarded };
+}
+
+/** `delta` in the current spec, `textDelta` in older ones; both appear across Mastra's four. */
+function textDeltaOf(part: unknown): string | undefined {
+  if (typeof part !== "object" || part === null) return undefined;
+  if (Reflect.get(part, "type") !== "text-delta") return undefined;
+
+  for (const key of ["delta", "textDelta", "text"]) {
+    const value = Reflect.get(part, key);
+    if (typeof value === "string") return value;
+  }
+  return undefined;
 }
 
 function readModelId(target: object): string {
