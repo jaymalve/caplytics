@@ -18,9 +18,11 @@ import {
 } from "@caplytics/core";
 import { ModelRouterLanguageModel } from "@mastra/core/llm";
 import type { CallSelection } from "../../model/proxy-language-model.js";
+import { currentRun } from "../../run/run-context.js";
 import { createSpendRecorder, type RecordedCall } from "../../spend/spend-recorder.js";
 import type { AnyAgent, CaplyticsConfig } from "./agent-types.js";
 import { attach, budgetKeyFor } from "./attach.js";
+import { mergeMetadata, readCallMetadata } from "./call-metadata.js";
 import { resolveRun } from "./run-identity.js";
 import { usageFromResult } from "./usage-from-result.js";
 import { validateConfig } from "./validate-config.js";
@@ -133,7 +135,11 @@ export function attachWithRecording<T extends AnyAgent>(
       agentId,
       budgetKey,
       cap,
-      metadata: { ...config.metadata },
+      metadata: mergeMetadata(
+        config.metadata,
+        currentRun()?.metadata,
+        readCallMetadata(requestContext),
+      ),
     };
 
     const scope: BudgetScope = { runId: call.runId, budgetKey };
