@@ -15,6 +15,13 @@ export {
 } from "./budget/budget-state.js";
 export type { BudgetStore, Reservation, ReserveOutcome } from "./budget/budget-store.js";
 export {
+  assertValidLadder,
+  type DegradeLadder,
+  type DegradeRung,
+  REQUIRED_HEADROOM,
+  resolveRung,
+} from "./budget/degrade-ladder.js";
+export {
   createInMemoryBudgetStore,
   type InMemoryBudgetStoreOptions,
 } from "./budget/in-memory-budget-store.js";
