@@ -14,7 +14,10 @@
     "test": "bun test",
     "lint": "biome check .",
     "format": "biome check --write .",
-    "verify": "bun run lint && bun run typecheck && bun run build && bun run test"
+    "verify": "bun run lint && bun run typecheck && bun run build && bun run test",
+    "db:up": "docker compose up -d --wait",
+    "db:down": "docker compose down -v",
+    "test:integration": "CAPLYTICS_TEST_DATABASE_URL=postgres://caplytics:caplytics@localhost:5433/caplytics bun test"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.3.14",
