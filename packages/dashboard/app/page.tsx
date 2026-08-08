@@ -1,34 +1,27 @@
+import { formatUsd, usdToMicroDollars } from "@caplytics/core";
+import { listAgents, querySpend } from "@caplytics/core/postgres";
+import { Suspense } from "react";
+import { FilterBar } from "@/components/filter-bar";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { database } from "@/lib/database";
+import { type FilterSearchParams, toEventFilter } from "@/lib/filter-params";
 import { auth, signOut } from "../auth";
 
-/**
- * The shell only. §8.2's filter bar and data table arrive with the query wiring; this PR proves the
- * app boots, authenticates, and knows who is signed in.
- */
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<FilterSearchParams>;
+}) {
   const session = await auth();
+  const params = await searchParams;
 
   return (
-    <main style={{ maxWidth: "72rem", margin: "0 auto", padding: "2rem 1.5rem" }}>
-      <header
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          borderBottom: "1px solid var(--border)",
-          paddingBottom: "1rem",
-        }}
-      >
+    <main className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-8">
+      <header className="flex items-center justify-between border-b pb-4">
         <div>
-          <h1 style={{ margin: 0, fontSize: "1.25rem" }}>Caplytics</h1>
-          <p
-            style={{
-              margin: "0.25rem 0 0",
-              color: "var(--muted-foreground)",
-              fontSize: "0.875rem",
-            }}
-          >
-            Agent spend, by run and by call.
-          </p>
+          <h1 className="text-xl font-semibold">Caplytics</h1>
+          <p className="text-sm text-muted-foreground">Agent spend, by run and by call.</p>
         </div>
 
         <form
@@ -36,21 +29,73 @@ export default async function DashboardPage() {
             "use server";
             await signOut({ redirectTo: "/login" });
           }}
+          className="flex items-center gap-3"
         >
-          <span
-            style={{
-              marginRight: "0.75rem",
-              color: "var(--muted-foreground)",
-              fontSize: "0.875rem",
-            }}
-          >
-            {session?.user?.email}
-          </span>
-          <button type="submit">Sign out</button>
+          <span className="text-sm text-muted-foreground">{session?.user?.email}</span>
+          <Button type="submit" variant="outline">
+            Sign out
+          </Button>
         </form>
       </header>
 
-      <p style={{ color: "var(--muted-foreground)" }}>Filters and the event table land next.</p>
+      {/* Suspense per section, so a slow aggregate does not hold back the filter controls. */}
+      <Suspense fallback={<Skeleton className="h-16 w-full" />}>
+        <Filters />
+      </Suspense>
+
+      <Suspense fallback={<SummarySkeleton />}>
+        <Summary params={params} />
+      </Suspense>
     </main>
+  );
+}
+
+async function Filters() {
+  // Every agent that has spent, not only those matching the current filter — narrowing the list to
+  // the active filter would make it impossible to switch to any other agent.
+  const agents = await listAgents(database());
+
+  return <FilterBar agents={agents} />;
+}
+
+/**
+ * §8.2 has no summary cards — the table carries the totals. This is the filtered aggregate only,
+ * which is what §6.2's `query()` answers and what the table below it will page through.
+ */
+async function Summary({ params }: { params: FilterSearchParams }) {
+  const spend = await querySpend(database(), toEventFilter(params));
+
+  return (
+    <section className="flex flex-wrap items-baseline gap-x-8 gap-y-2 text-sm">
+      <Figure label="Total" value={formatUsd(usdToMicroDollars(spend.totalCost))} />
+      <Figure label="Calls" value={String(spend.callCount)} />
+      {spend.unpricedCount > 0 ? (
+        <Figure
+          label="Unpriced"
+          value={String(spend.unpricedCount)}
+          // Surfaced rather than folded into the total: those calls cost money nobody can attribute.
+          hint="not included in the total"
+        />
+      ) : null}
+    </section>
+  );
+}
+
+function Figure({ label, value, hint }: { label: string; value: string; hint?: string }) {
+  return (
+    <div className="flex flex-col">
+      <span className="text-xs uppercase tracking-wide text-muted-foreground">{label}</span>
+      <span className="font-mono text-lg">{value}</span>
+      {hint === undefined ? null : <span className="text-xs text-muted-foreground">{hint}</span>}
+    </div>
+  );
+}
+
+function SummarySkeleton() {
+  return (
+    <div className="flex gap-8">
+      <Skeleton className="h-12 w-28" />
+      <Skeleton className="h-12 w-20" />
+    </div>
   );
 }
