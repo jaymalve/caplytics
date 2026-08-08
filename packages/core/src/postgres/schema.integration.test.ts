@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { SQL } from "bun";
 import { migrate } from "./migrate.js";
 import { DAILY_ROLLUP_VIEW, EVENTS_TABLE, MIGRATIONS_TABLE } from "./migrations.js";
@@ -17,6 +17,13 @@ const describeWithDatabase = DATABASE_URL === undefined ? describe.skip : descri
 
 const db = DATABASE_URL === undefined ? undefined : new SQL(DATABASE_URL);
 
+/**
+ * These tests drop and recreate the schema to prove creation, so they run in a Postgres schema of
+ * their own. Bun executes test files in parallel, and dropping the shared table would destroy the
+ * query tests' data mid-run — which it did, until this isolation was added.
+ */
+const TEST_SCHEMA = "caplytics_schema_test";
+
 const sql: SqlExecutor = {
   // biome-ignore lint/suspicious/noExplicitAny: bridging Bun's SQL to the driver-agnostic shape
   query: async (text: string, params?: unknown[]): Promise<any> => {
@@ -24,6 +31,14 @@ const sql: SqlExecutor = {
     return { rows: Array.isArray(rows) ? rows : [] };
   },
 };
+
+beforeAll(async () => {
+  if (db === undefined) return;
+
+  await sql.query(`CREATE SCHEMA IF NOT EXISTS ${TEST_SCHEMA}`);
+  // Unqualified names in the migrations resolve here; timescaledb stays where it was installed.
+  await sql.query(`SET search_path TO ${TEST_SCHEMA}, public`);
+});
 
 afterAll(async () => {
   await db?.close();
@@ -52,8 +67,8 @@ describeWithDatabase("against a real TimescaleDB", () => {
   test("creates a hypertable partitioned on timestamp", async () => {
     const result = await sql.query<{ hypertable_name: string }>(
       `SELECT hypertable_name FROM timescaledb_information.hypertables
-       WHERE hypertable_name = $1`,
-      [EVENTS_TABLE],
+       WHERE hypertable_name = $1 AND hypertable_schema = $2`,
+      [EVENTS_TABLE, TEST_SCHEMA],
     );
 
     expect(result.rows).toHaveLength(1);
@@ -62,8 +77,8 @@ describeWithDatabase("against a real TimescaleDB", () => {
   test("creates the continuous aggregate §7 chose Timescale for", async () => {
     const result = await sql.query<{ view_name: string }>(
       `SELECT view_name FROM timescaledb_information.continuous_aggregates
-       WHERE view_name = $1`,
-      [DAILY_ROLLUP_VIEW],
+       WHERE view_name = $1 AND view_schema = $2`,
+      [DAILY_ROLLUP_VIEW, TEST_SCHEMA],
     );
 
     expect(result.rows).toHaveLength(1);
