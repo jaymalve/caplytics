@@ -1,8 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { SQL } from "bun";
 import { migrate } from "./migrate.js";
 import { DAILY_ROLLUP_VIEW, EVENTS_TABLE, MIGRATIONS_TABLE } from "./migrations.js";
-import type { SqlExecutor } from "./sql-executor.js";
+import { createTestPool } from "./test-database.js";
 
 /**
  * Runs against a real TimescaleDB — `docker compose up -d`, then set the URL.
@@ -11,11 +10,6 @@ import type { SqlExecutor } from "./sql-executor.js";
  * genuinely verified here: statements that parse fine as strings still fail against a real
  * hypertable, which is exactly what §10's open item 5 asked to settle.
  */
-const DATABASE_URL = process.env.CAPLYTICS_TEST_DATABASE_URL;
-
-const describeWithDatabase = DATABASE_URL === undefined ? describe.skip : describe;
-
-const db = DATABASE_URL === undefined ? undefined : new SQL(DATABASE_URL);
 
 /**
  * These tests drop and recreate the schema to prove creation, so they run in a Postgres schema of
@@ -24,24 +18,24 @@ const db = DATABASE_URL === undefined ? undefined : new SQL(DATABASE_URL);
  */
 const TEST_SCHEMA = "caplytics_schema_test";
 
-const sql: SqlExecutor = {
-  // biome-ignore lint/suspicious/noExplicitAny: bridging Bun's SQL to the driver-agnostic shape
-  query: async (text: string, params?: unknown[]): Promise<any> => {
-    const rows = await (db as SQL).unsafe(text, (params ?? []) as never);
-    return { rows: Array.isArray(rows) ? rows : [] };
-  },
-};
+const pool = createTestPool(TEST_SCHEMA);
+const describeWithDatabase = pool === undefined ? describe.skip : describe;
+
+// biome-ignore lint/style/noNonNullAssertion: the suite is skipped entirely when there is no pool
+const sql = pool!;
 
 beforeAll(async () => {
-  if (db === undefined) return;
+  if (pool === undefined) return;
 
-  await sql.query(`CREATE SCHEMA IF NOT EXISTS ${TEST_SCHEMA}`);
-  // Unqualified names in the migrations resolve here; timescaledb stays where it was installed.
-  await sql.query(`SET search_path TO ${TEST_SCHEMA}, public`);
+  // Created through a separate connection, because the pool's own connections already point their
+  // search path at a schema that does not exist yet.
+  const bootstrap = createTestPool();
+  await bootstrap?.query(`CREATE SCHEMA IF NOT EXISTS ${TEST_SCHEMA}`);
+  await bootstrap?.end();
 });
 
 afterAll(async () => {
-  await db?.close();
+  await pool?.end();
 });
 
 describeWithDatabase("against a real TimescaleDB", () => {

@@ -1,36 +1,36 @@
-# The query layer's write-path integration test is not yet green
+# The query layer's integration harness uses pg, not Bun's SQL
 
 **Relates to:** §6.2, §8.5
-**Status:** Open — production code verified directly, harness not
+**Status:** Resolved
 
-## What is verified
+## What happened
 
-- `buildWhere`, `toCaplyticsEvent`, cursor construction and the aggregate shape: 28 unit tests.
-- Against a real TimescaleDB, by direct diagnostic script rather than the test suite:
-  - the combined `timestamp >= $1 AND timestamp < $2 AND metadata @> $3::jsonb` clause returns the
-    right rows,
-  - `insertEvents` writes a three-row batch correctly, with metadata and BIGINT costs intact,
-  - `jsonb` returns as raw text under Bun's driver and as an object under `pg` — both narrowed.
+The write-path integration test was first written against Bun's built-in `SQL`, bridged to
+`SqlExecutor` by a small adapter. Through that bridge a multi-row `INSERT` landed **only its first
+row** — 25 events in, 1 row out — while the identical call from a standalone script wrote every
+row. The production code was never at fault; the bridge or Bun's parameter binding at that size
+was.
 
-## What is not
+## Decision
 
-An integration test for `listEvents` / `querySpend` / `insertEvents` against the real database.
-Building it surfaced two harness problems and one unresolved one:
+Integration tests use `pg`.
 
-1. **Fixed:** the schema tests drop the events table to prove creation, and Bun runs test files in
-   parallel, so they destroyed the query tests' seed mid-run. The schema tests now run in a Postgres
-   schema of their own.
-2. **Fixed:** seeded data collided across runs. Agent ids and a metadata marker are namespaced per
-   run so nothing needs deleting.
-3. **Unresolved:** through the test file's `SqlExecutor` bridge over Bun's `SQL.unsafe`, a
-   multi-row `INSERT` lands only its first row — 25 events in, 1 row out. The identical call
-   through a standalone script writes every row. So this is the bridge or Bun's parameter binding
-   at that size, not `insertEvents`.
+`pg.Pool` satisfies `SqlExecutor` structurally with **no adapter at all**, which is the point: there
+is no bridge left to get wrong, and the tests exercise exactly the path the dashboard will use.
+Bun's SQL had been chosen only to avoid a devDependency, and that thrift cost more than it saved —
+a harness bug that masqueraded as a query bug for most of PR 14.
 
-## What to do
+`pg` is a devDependency of `@caplytics/core`. The package still declares no runtime driver
+dependency, so the purity boundary is unchanged.
 
-Re-add the test with `pg` rather than `Bun.SQL` as the integration driver. `pg` is what the
-dashboard will use anyway, so the harness would then exercise the same path production does — which
-is the more useful test regardless of this bug. Bun's SQL was chosen only to avoid a devDependency.
+## Also fixed while isolating this
 
-Until then the write path is verified by inspection and by a script, not by CI.
+- The schema tests drop the events table to prove creation, and Bun runs test files in parallel, so
+  they were destroying a sibling file's seed mid-run. They now run in a Postgres schema of their
+  own.
+- Seeded rows are namespaced per run, so nothing needs deleting and no run can count another's data.
+
+## What this leaves
+
+A test that would have caught the original bug: "writes every row of a batch" asserts 25 rows in and
+25 counted back.

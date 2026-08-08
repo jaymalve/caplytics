@@ -17,4 +17,4 @@ Per §9.1, this document links out; it does not duplicate.
 | [mastra-internal-api-coupling.md](mastra-internal-api-coupling.md) | §1 | Accepted |
 | [run-scoping-api.md](run-scoping-api.md) | §1, §4 | Accepted — adds public API |
 | [per-tool-caps-deferred.md](per-tool-caps-deferred.md) | §2.1 | **Open** — deferred, not yet decided |
-| [query-layer-integration-gap.md](query-layer-integration-gap.md) | §6.2, §8.5 | **Open** — harness gap |
+| [query-layer-integration-gap.md](query-layer-integration-gap.md) | §6.2, §8.5 | Resolved — integration harness uses pg |
