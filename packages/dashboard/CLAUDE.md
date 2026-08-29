@@ -22,6 +22,12 @@ Read and narrowed once in `lib/env.ts` (§9.2). A dashboard that boots with a mi
 
 Runner: `bun test`, colocated. Pure logic only — URL/filter mapping and cursor encoding. Components are not unit-tested here; the query layer they render is covered by core's integration tests against a real database.
 
+## Auth is checked twice, on purpose
+
+`middleware.ts` only redirects when a session cookie is absent, and imports nothing from `auth.ts`. It is a UX guard: a cookie's presence proves nothing, and middleware-only auth is a known bypass class in Next.js. The authoritative check is `auth()` inside the page, which verifies the session.
+
+Keeping next-auth out of the middleware also keeps its config out of the edge bundle, where `process.env` is a limited proxy rather than the real object. For the same reason `lib/env.ts` reads each key explicitly instead of parsing `process.env` wholesale — Next inlines only statically-referenced keys, and parsing the object yields undefined for everything.
+
 ## UI
 
 shadcn components for anything shadcn provides. Skeleton loaders only — no spinners, anywhere. `useEffect` is for synchronising with an external system, not for fetching data or deriving state (§9.3).

@@ -1,3 +1,13 @@
+// Re-exported so attaching a budget does not also require depending on @caplytics/core. Anyone
+// reading an event needs to format the money on it; the type is core's, the convenience is here.
+export {
+  type CaplyticsEvent,
+  type CaplyticsEventType,
+  formatUsd,
+  type MicroDollars,
+  microDollarsToUsd,
+  usdToMicroDollars,
+} from "@caplytics/core";
 export type {
   AnyAgent,
   CaplyticsConfig,

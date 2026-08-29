@@ -29,7 +29,17 @@ let cached: Environment | undefined;
 export function env(): Environment {
   if (cached !== undefined) return cached;
 
-  const parsed = environmentSchema.safeParse(process.env);
+  // Each key is read explicitly rather than handing the schema `process.env`. Next inlines only
+  // statically-referenced keys, and the edge runtime middleware runs in exposes a limited proxy
+  // rather than the real object — parsing it wholesale yields undefined for everything, which threw
+  // at module load and left the middleware with nothing to export.
+  const parsed = environmentSchema.safeParse({
+    DATABASE_URL: process.env.DATABASE_URL,
+    AUTH_SECRET: process.env.AUTH_SECRET,
+    GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
+    GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
+    ALLOWED_EMAIL_DOMAINS: process.env.ALLOWED_EMAIL_DOMAINS,
+  });
   if (!parsed.success) {
     const problems = parsed.error.issues.map(
       (issue) => `  ${issue.path.join(".")}: ${issue.message}`,

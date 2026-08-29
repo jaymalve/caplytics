@@ -11,6 +11,18 @@
         "typescript": "^5.9.3",
       },
     },
+    "examples/support-agent": {
+      "name": "@caplytics/example-support-agent",
+      "version": "0.0.0",
+      "dependencies": {
+        "@mastra/core": "^1.55.0",
+        "caplytics": "workspace:*",
+        "zod": "^4.4.3",
+      },
+      "devDependencies": {
+        "typescript": "^5.9.3",
+      },
+    },
     "packages/caplytics": {
       "name": "caplytics",
       "version": "0.0.0",
@@ -168,6 +180,8 @@
     "@biomejs/cli-win32-x64": ["@biomejs/cli-win32-x64@2.5.6", "", { "os": "win32", "cpu": "x64" }, "sha512-WN05KwXnTO/2J45RQPvzZMXf7tZUIofHoR35xIPfCo7pQ2RFidxI8sfb5mGsaTxdMmEOzHzOPRCdA5/fCpc7xQ=="],
 
     "@caplytics/core": ["@caplytics/core@workspace:packages/core"],
+
+    "@caplytics/example-support-agent": ["@caplytics/example-support-agent@workspace:examples/support-agent"],
 
     "@date-fns/tz": ["@date-fns/tz@1.5.0", "", {}, "sha512-lwYN/vDPeNRULcepoE/LO2Pgx+7/RV+S9ARfbc9lr2DtGkOD7pAiruHvbR1RX3Qyf6ja47EWJDMsNK5vK08DJg=="],
 
