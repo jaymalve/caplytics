@@ -1,12 +1,13 @@
 {
   "name": "@caplytics/core",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Shared event schema, cost model, and query layer for Caplytics.",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
   "files": [
-    "dist"
+    "dist",
+    "README.md"
   ],
   "exports": {
     ".": {
@@ -31,5 +32,10 @@
   "devDependencies": {
     "@types/pg": "^8.21.0",
     "pg": "^8.23.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jaymalave/caplytics.git",
+    "directory": "packages/core"
   }
 }

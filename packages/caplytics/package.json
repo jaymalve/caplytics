@@ -1,12 +1,13 @@
 {
   "name": "caplytics",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Spend-control and cost tracking for AI agents. Attach a budget in one line.",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
   "files": [
-    "dist"
+    "dist",
+    "README.md"
   ],
   "exports": {
     ".": {
@@ -19,7 +20,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@caplytics/core": "workspace:*"
+    "@caplytics/core": "^0.1.0"
   },
   "peerDependencies": {
     "@mastra/core": "^1.55.0"
@@ -35,5 +36,10 @@
   "devDependencies": {
     "@mastra/core": "^1.55.0",
     "zod": "^4.4.3"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jaymalave/caplytics.git",
+    "directory": "packages/caplytics"
   }
 }

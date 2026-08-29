@@ -33,9 +33,14 @@ describe.each(packages)("packages/%s", (dir) => {
     }
   });
 
-  test("only dist is published", async () => {
+  // Source, tests and configs must never ship; the README must, or the npm page is blank.
+  test("publishes the build output and the README, and nothing else", async () => {
     const manifest = await readManifest(dir);
-    expect(manifest.files).toEqual(["dist"]);
+    expect(manifest.files).toEqual(["dist", "README.md"]);
+  });
+
+  test("has a README to publish", async () => {
+    expect(existsSync(join(repoRoot, "packages", dir, "README.md"))).toBe(true);
   });
 });
 
