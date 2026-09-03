@@ -18,6 +18,14 @@ Read and narrowed once in `lib/env.ts` (§9.2). A dashboard that boots with a mi
 
 `ALLOWED_EMAIL_DOMAINS` is unset by default, which §8.6 accepts for a single-team tool — but unset means any Google account can sign in. The domain check lives in the `signIn` callback, not the UI: a check that only hides a button is not a check.
 
+## Tests
+
+Runner: `bun test`, colocated. Pure logic only — URL/filter mapping and cursor encoding. Components are not unit-tested here; the query layer they render is covered by core's integration tests against a real database.
+
 ## UI
 
 shadcn components for anything shadcn provides. Skeleton loaders only — no spinners, anywhere. `useEffect` is for synchronising with an external system, not for fetching data or deriving state (§9.3).
+
+`components/ui/` is vendored: `shadcn add` regenerates it, so it is excluded from linting and this package relaxes `exactOptionalPropertyTypes`. Do not hand-edit those files expecting the change to survive.
+
+The table is deliberately not sortable — see [architecture/table-sorting-and-cursors.md](../../architecture/table-sorting-and-cursors.md). A keyset cursor is a position in one ordering, so a sortable column would page through an order the cursor does not describe.

@@ -13,6 +13,8 @@ export type FilterSearchParams = {
   agent?: string;
   /** Repeatable `key:value` pairs — arbitrary keys, per §6.1. */
   meta?: string | string[];
+  /** Opaque keyset position (§8.5); decoded by lib/cursor.ts, never built by hand. */
+  cursor?: string;
 };
 
 const METADATA_SEPARATOR = ":";

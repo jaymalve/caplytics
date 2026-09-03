@@ -1,9 +1,11 @@
 import { formatUsd, usdToMicroDollars } from "@caplytics/core";
-import { listAgents, querySpend } from "@caplytics/core/postgres";
+import { listAgents, listEvents, querySpend } from "@caplytics/core/postgres";
 import { Suspense } from "react";
+import { EventTable } from "@/components/event-table";
 import { FilterBar } from "@/components/filter-bar";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { decodeCursor } from "@/lib/cursor";
 import { database } from "@/lib/database";
 import { type FilterSearchParams, toEventFilter } from "@/lib/filter-params";
 import { auth, signOut } from "../auth";
@@ -46,6 +48,10 @@ export default async function DashboardPage({
       <Suspense fallback={<SummarySkeleton />}>
         <Summary params={params} />
       </Suspense>
+
+      <Suspense fallback={<TableSkeleton />}>
+        <Events params={params} />
+      </Suspense>
     </main>
   );
 }
@@ -87,6 +93,35 @@ function Figure({ label, value, hint }: { label: string; value: string; hint?: s
       <span className="text-xs uppercase tracking-wide text-muted-foreground">{label}</span>
       <span className="font-mono text-lg">{value}</span>
       {hint === undefined ? null : <span className="text-xs text-muted-foreground">{hint}</span>}
+    </div>
+  );
+}
+
+async function Events({ params }: { params: FilterSearchParams }) {
+  const page = await listEvents(database(), {
+    ...toEventFilter(params),
+    ...(decodeCursor(params.cursor) === undefined
+      ? {}
+      : // biome-ignore lint/style/noNonNullAssertion: guarded by the check above
+        { cursor: decodeCursor(params.cursor)! }),
+  });
+
+  return (
+    <EventTable
+      events={page.events}
+      nextCursor={page.nextCursor}
+      searchParams={params as Record<string, string | string[] | undefined>}
+    />
+  );
+}
+
+function TableSkeleton() {
+  return (
+    <div className="flex flex-col gap-2">
+      {Array.from({ length: 8 }, (_, row) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: fixed-length placeholder rows
+        <Skeleton key={row} className="h-10 w-full" />
+      ))}
     </div>
   );
 }
