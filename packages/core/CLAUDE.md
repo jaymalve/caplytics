@@ -14,8 +14,25 @@ Everything in the root entry is pure and synchronous where it can be: given the 
 
 Costs are stored as **integer micro-dollars** (1 USD = 1_000_000). Floating-point dollars accumulate error across thousands of events and make equality assertions flaky. Convert to a decimal only at display boundaries.
 
+## Persistence
+
+`src/postgres/` holds §7's schema. It declares an `SqlExecutor` shape rather than depending on a
+driver, so a caller passes the `pg.Pool` they already have — that is what keeps a native dependency
+out of every agent install, and what lets the boundary test stay green.
+
+Migrations are lists of individually idempotent statements applied one at a time. They cannot be
+wrapped in a transaction: TimescaleDB refuses to create a continuous aggregate inside one.
+
 ## Tests
 
 Runner: `bun test`. Colocated as `src/thing.test.ts`.
+
+Schema tests come in two halves. `migrate.test.ts` runs everywhere against a fake executor.
+`schema.integration.test.ts` needs a real TimescaleDB and skips without one — SQL that parses as a
+string still fails against a real hypertable, so the schema is only genuinely verified there:
+
+```
+bun run db:up && bun run test:integration
+```
 
 Every exported function in this package needs unit tests — it holds the pure logic, so there is no excuse for an untested branch here. Cost calculation and the budget ledger additionally need table-driven cases covering the boundaries: zero cost, unknown price, exactly-at-cap, and concurrent reservations.

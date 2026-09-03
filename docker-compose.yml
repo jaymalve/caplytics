@@ -1,0 +1,15 @@
+# Local and CI Postgres for the query layer (§7). Not the dashboard image (§8.7).
+services:
+  timescale:
+    image: timescale/timescaledb:2.17.2-pg16
+    environment:
+      POSTGRES_PASSWORD: caplytics
+      POSTGRES_USER: caplytics
+      POSTGRES_DB: caplytics
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U caplytics"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
