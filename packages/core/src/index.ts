@@ -48,10 +48,10 @@ export {
   modelIdCandidates,
   type PriceTable,
 } from "./pricing/price-table.js";
-export { priceToolResult, type ToolResultPricing } from "./pricing/price-tool-result.js";
 export {
   type TokenUsage,
   tokenUsageSchema,
   totalInputTokens,
   ZERO_TOKEN_USAGE,
 } from "./pricing/token-usage.js";
+export { toolResultTokens } from "./pricing/tool-result-tokens.js";

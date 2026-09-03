@@ -22,8 +22,12 @@ export const caplyticsEventSchema = z.object({
   tokensIn: z.int().nonnegative().optional(),
   tokensOut: z.int().nonnegative().optional(),
 
-  /** Signed: a run that overspends mid-stream ends below zero, and §4.2 requires reporting that. */
-  budgetRemaining: microDollarsSchema,
+  /**
+   * Signed, because a run that overspends mid-stream ends below zero and §4.2 requires reporting
+   * that rather than clamping. Null when the run is uncapped (§10's `cap: "unlimited"`), which has
+   * no remainder to report — zero would read as "nothing left" and mean the opposite.
+   */
+  budgetRemaining: microDollarsSchema.nullable(),
 
   timestamp: z.iso.datetime(),
   metadata: z.record(z.string(), z.string()),

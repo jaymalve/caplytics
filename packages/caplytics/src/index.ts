@@ -11,6 +11,13 @@ export {
   type InterceptionScope,
 } from "./adapters/mastra/attach.js";
 export {
+  attachWithRecording,
+  DEFAULT_CAP_USD,
+  type RecordingDeps,
+} from "./adapters/mastra/attach-with-recording.js";
+export { RUN_ID_CONTEXT_KEY, resolveRun } from "./adapters/mastra/run-identity.js";
+export { usageFromResult } from "./adapters/mastra/usage-from-result.js";
+export {
   type Caplytics,
   type CaplyticsOptions,
   caplytics,
@@ -31,3 +38,4 @@ export {
 } from "./pricing/litellm-price-source.js";
 export { type PriceSource, staticPriceSource } from "./pricing/price-source.js";
 export { currentRun, newRunId, type RunContext, withRun } from "./run/run-context.js";
+export { createSpendRecorder, type RecordedCall } from "./spend/spend-recorder.js";
