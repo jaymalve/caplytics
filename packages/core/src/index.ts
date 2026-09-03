@@ -2,6 +2,19 @@
 // architecture/core-subpath-exports.md — persistence lives at `@caplytics/core/postgres`.
 
 export {
+  type BudgetScope,
+  type BudgetState,
+  budgetRemaining,
+  budgetSpent,
+  budgetUsedFraction,
+  scopeId,
+} from "./budget/budget-state.js";
+export type { BudgetStore, Reservation, ReserveOutcome } from "./budget/budget-store.js";
+export {
+  createInMemoryBudgetStore,
+  type InMemoryBudgetStoreOptions,
+} from "./budget/in-memory-budget-store.js";
+export {
   type CaplyticsEvent,
   type CaplyticsEventType,
   caplyticsEventSchema,

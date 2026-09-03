@@ -20,7 +20,7 @@ Per-run is chosen because it is the only scope enforceable without putting a dat
 
 `config.budget` retains its §2.2 meaning: several agents in one run share a pool, which is coherent under run scope (an orchestrator agent delegating to sub-agents).
 
-Windowed caps (`window: "day" | "month"`) are a v2 feature. `BudgetStore` exists so they drop in without touching `attach()`.
+Windowed caps (`window: "day" | "month"`) are a v2 feature. `BudgetStore` exists so they can arrive without touching `attach()` — but not as a free swap: every method on the interface is synchronous, and that is what makes a reservation atomic against parallel tool calls. A persistent store cannot inherit in-process atomicity; it needs its own strategy at the database level and an awaitable interface. Treat `BudgetStore` as the shape of the in-process contract, not as one a remote store drops into unchanged.
 
 ### State location
 
