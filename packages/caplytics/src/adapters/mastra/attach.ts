@@ -31,6 +31,13 @@ export type AttachHooks = {
    * reuses it — see architecture/mastra-interception-points.md.
    */
   selectForCall?: (info: { readonly scope: InterceptionScope }) => CallSelection | undefined;
+
+  /** §4.2: consulted as a stream produces output, to stop one that would cross the cap. */
+  onStreamProgress?: (info: {
+    readonly scope: InterceptionScope;
+    readonly modelId: string;
+    readonly estimatedOutputTokens: number;
+  }) => "continue" | "abort";
   onModelCall?: (info: {
     readonly scope: InterceptionScope;
     readonly modelId: string;
@@ -111,6 +118,12 @@ function modelHooks(scope: InterceptionScope, hooks: AttachHooks): ModelCallHook
     ...(hooks.selectForCall === undefined
       ? {}
       : { selectForCall: () => hooks.selectForCall?.({ scope }) }),
+    ...(hooks.onStreamProgress === undefined
+      ? {}
+      : {
+          onStreamProgress: ({ modelId, estimatedOutputTokens }) =>
+            hooks.onStreamProgress?.({ scope, modelId, estimatedOutputTokens }) ?? "continue",
+        }),
     onCallStart: ({ modelId, method }) => hooks.onModelCall?.({ scope, modelId, method }),
     onCallFinish: ({ modelId, result }) => hooks.onModelResult?.({ scope, modelId, result }),
     onCallError: ({ modelId, error }) => hooks.onModelError?.({ scope, modelId, error }),
