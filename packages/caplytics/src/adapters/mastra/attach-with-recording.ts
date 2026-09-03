@@ -1,5 +1,4 @@
 import {
-  assertValidLadder,
   type BudgetScope,
   type BudgetStore,
   budgetSpent,
@@ -24,6 +23,7 @@ import type { AnyAgent, CaplyticsConfig } from "./agent-types.js";
 import { attach, budgetKeyFor } from "./attach.js";
 import { resolveRun } from "./run-identity.js";
 import { usageFromResult } from "./usage-from-result.js";
+import { validateConfig } from "./validate-config.js";
 
 /** §10 item 4: zero-config must still enforce something, and warn rather than kill a first run. */
 export const DEFAULT_CAP_USD = 1;
@@ -45,6 +45,9 @@ export function attachWithRecording<T extends AnyAgent>(
   config: CaplyticsConfig<T>,
   deps: RecordingDeps,
 ): T {
+  // Everything checked here would otherwise fail silently at runtime (§5.1 among them).
+  validateConfig(config);
+
   const recorder = createSpendRecorder(deps);
   const budgetKey = budgetKeyFor(agent, config);
   const cap = resolveCap(config.cap);
@@ -58,8 +61,6 @@ export function attachWithRecording<T extends AnyAgent>(
 
   const policy: LimitPolicy = config.onLimit ?? "warn";
   const ladder = config.degrade ?? [];
-  // §5.1: an unworkable ladder is a startup error, not a surprise on the call where it flaps.
-  assertValidLadder(ladder, policy === "block");
   const warnedRuns = new Set<string>();
 
   // Substitute models are built once and reused; constructing a router per call would pay setup

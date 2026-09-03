@@ -17,6 +17,7 @@ export {
 } from "./adapters/mastra/attach-with-recording.js";
 export { RUN_ID_CONTEXT_KEY, resolveRun } from "./adapters/mastra/run-identity.js";
 export { usageFromResult } from "./adapters/mastra/usage-from-result.js";
+export { validateConfig } from "./adapters/mastra/validate-config.js";
 export {
   type Caplytics,
   type CaplyticsOptions,
