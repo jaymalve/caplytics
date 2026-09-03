@@ -154,3 +154,88 @@ describe("hooks", () => {
     expect(await proxied.doStream()).toEqual({ stream: "streaming" });
   });
 });
+
+/**
+ * §5's ladder lives here rather than in the model resolver: Mastra resolves a model twice per run
+ * and reuses the instance, so this wrapper is the only seam entered on every call.
+ */
+describe("per-call selection", () => {
+  function labelled(modelId: string, seen: string[]) {
+    return {
+      specificationVersion: "v2" as const,
+      provider: "stub",
+      modelId,
+      supportedUrls: {},
+      async doGenerate(options: { maxOutputTokens?: number }) {
+        seen.push(`${modelId}:${String(options?.maxOutputTokens)}`);
+        return { ok: modelId };
+      },
+      async doStream() {
+        return { streamed: modelId };
+      },
+    };
+  }
+
+  test("delegates to the wrapped model when nothing is selected", async () => {
+    const seen: string[] = [];
+    const proxied = proxyLanguageModel(labelled("base", seen), { selectForCall: () => undefined });
+
+    await proxied.doGenerate({});
+
+    expect(seen).toEqual(["base:undefined"]);
+  });
+
+  test("delegates to a substituted model for that call only", async () => {
+    const seen: string[] = [];
+    const cheap = labelled("cheap", seen);
+    let degraded = false;
+    const proxied = proxyLanguageModel(labelled("base", seen), {
+      selectForCall: () => (degraded ? { model: cheap } : undefined),
+    });
+
+    await proxied.doGenerate({});
+    degraded = true;
+    await proxied.doGenerate({});
+    degraded = false;
+    await proxied.doGenerate({});
+
+    // Down a rung and back up again, which §5 requires to work in both directions.
+    expect(seen).toEqual(["base:undefined", "cheap:undefined", "base:undefined"]);
+  });
+
+  test("reports the substituted model's id, so events name what actually ran", async () => {
+    const seen: string[] = [];
+    const ids: string[] = [];
+    const proxied = proxyLanguageModel(labelled("base", seen), {
+      selectForCall: () => ({ model: labelled("cheap", seen) }),
+      onCallFinish: (info) => ids.push(info.modelId),
+    });
+
+    await proxied.doGenerate({});
+
+    expect(ids).toEqual(["cheap"]);
+  });
+
+  test("clamps output tokens", async () => {
+    const seen: string[] = [];
+    const proxied = proxyLanguageModel(labelled("base", seen), {
+      selectForCall: () => ({ maxOutputTokens: 500 }),
+    });
+
+    await proxied.doGenerate({});
+
+    expect(seen).toEqual(["base:500"]);
+  });
+
+  // Raising a caller's own limit to spend more budget would invert what they asked for.
+  test("lowers a caller's limit but never raises it", async () => {
+    const seen: string[] = [];
+    const proxied = proxyLanguageModel(labelled("base", seen), {
+      selectForCall: () => ({ maxOutputTokens: 500 }),
+    });
+
+    await proxied.doGenerate({ maxOutputTokens: 100 });
+
+    expect(seen).toEqual(["base:100"]);
+  });
+});

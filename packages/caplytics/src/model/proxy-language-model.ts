@@ -9,6 +9,22 @@ export type ModelCallHooks = {
     readonly result: unknown;
   }) => void;
   onCallError?: (info: { readonly modelId: string; readonly error: unknown }) => void;
+
+  /**
+   * Chooses what this individual call should run against, consulted immediately before delegating.
+   *
+   * This is where §5's ladder lives. Mastra resolves a model twice per run and reuses the instance,
+   * so the resolver cannot re-evaluate per call — but this wrapper is entered on every one. See
+   * architecture/mastra-interception-points.md.
+   */
+  selectForCall?: () => CallSelection | undefined;
+};
+
+export type CallSelection = {
+  /** Delegate to this model instead of the wrapped one, for this call only. */
+  readonly model?: object;
+  /** Upper bound on this call's output tokens. */
+  readonly maxOutputTokens?: number;
 };
 
 const INTERCEPTED = new Set(["doGenerate", "doStream"]);
@@ -64,11 +80,24 @@ function intercepted(
 
   return memoise(bound, `caplytics:${method}`, () => {
     return async (...args: unknown[]): Promise<unknown> => {
-      const modelId = readModelId(target);
+      // Evaluated per call, not per resolution — the whole reason the ladder lives here.
+      const selection = hooks.selectForCall?.();
+      const delegate = selection?.model ?? target;
+      const modelId = readModelId(delegate);
+
       hooks.onCallStart?.({ modelId, method });
 
       try {
-        const result: unknown = await original.apply(target, args);
+        // Re-read from the delegate: a substituted model has its own implementation.
+        const call = Reflect.get(delegate, method, delegate);
+        if (typeof call !== "function") {
+          throw new TypeError(`caplytics: substituted model has no ${method}`);
+        }
+
+        const result: unknown = await call.apply(
+          delegate,
+          clampOutput(args, selection?.maxOutputTokens),
+        );
         hooks.onCallFinish?.({ modelId, method, result });
         return result;
       } catch (error) {
@@ -88,6 +117,20 @@ function memoise<T>(
 ): T {
   if (!cache.has(key)) cache.set(key, create());
   return cache.get(key) as T;
+}
+
+/**
+ * Lowers the ceiling, never raises it: a caller who asked for fewer tokens than the rung allows
+ * meant it, and lifting their limit to spend more budget would invert the intent.
+ */
+function clampOutput(args: unknown[], limit: number | undefined): unknown[] {
+  const [options, ...rest] = args;
+  if (limit === undefined || typeof options !== "object" || options === null) return args;
+
+  const requested = Reflect.get(options, "maxOutputTokens");
+  const effective = typeof requested === "number" ? Math.min(requested, limit) : limit;
+
+  return [{ ...options, maxOutputTokens: effective }, ...rest];
 }
 
 function readModelId(target: object): string {

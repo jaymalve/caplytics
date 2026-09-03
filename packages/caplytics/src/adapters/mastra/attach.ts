@@ -1,5 +1,9 @@
 import { ModelRouterLanguageModel } from "@mastra/core/llm";
-import { type ModelCallHooks, proxyLanguageModel } from "../../model/proxy-language-model.js";
+import {
+  type CallSelection,
+  type ModelCallHooks,
+  proxyLanguageModel,
+} from "../../model/proxy-language-model.js";
 import type { AnyAgent, CaplyticsConfig } from "./agent-types.js";
 import { resolveDynamic, toolsAccessor } from "./mastra-internals.js";
 import { type ToolExecutionHooks, wrapToolMap } from "./wrap-tool-map.js";
@@ -20,6 +24,13 @@ export type InterceptionScope = {
 };
 
 export type AttachHooks = {
+  /**
+   * Consulted before every model call to pick that call's model and output cap (§5).
+   *
+   * Lives on the call rather than the resolution because Mastra resolves a model twice per run and
+   * reuses it — see architecture/mastra-interception-points.md.
+   */
+  selectForCall?: (info: { readonly scope: InterceptionScope }) => CallSelection | undefined;
   onModelCall?: (info: {
     readonly scope: InterceptionScope;
     readonly modelId: string;
@@ -97,6 +108,9 @@ export function budgetKeyFor<T extends AnyAgent>(agent: T, config: CaplyticsConf
 // bound in here so they stay reusable by a second adapter.
 function modelHooks(scope: InterceptionScope, hooks: AttachHooks): ModelCallHooks {
   return {
+    ...(hooks.selectForCall === undefined
+      ? {}
+      : { selectForCall: () => hooks.selectForCall?.({ scope }) }),
     onCallStart: ({ modelId, method }) => hooks.onModelCall?.({ scope, modelId, method }),
     onCallFinish: ({ modelId, result }) => hooks.onModelResult?.({ scope, modelId, result }),
     onCallError: ({ modelId, error }) => hooks.onModelError?.({ scope, modelId, error }),
