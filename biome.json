@@ -41,5 +41,18 @@
         "organizeImports": "on"
       }
     }
+  },
+  "overrides": [
+    {
+      "includes": ["packages/dashboard/components/ui/**"],
+      "linter": {
+        "enabled": false
+      }
+    }
+  ],
+  "css": {
+    "parser": {
+      "tailwindDirectives": true
+    }
   }
 }

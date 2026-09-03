@@ -1,6 +1,7 @@
 export { buildWhere, type EventFilter, type WhereClause } from "./event-filter.js";
 export { toCaplyticsEvent } from "./event-row.js";
 export { insertEvents } from "./insert-events.js";
+export { listAgents } from "./list-agents.js";
 export { type MigrationResult, migrate } from "./migrate.js";
 export {
   DAILY_ROLLUP_VIEW,
