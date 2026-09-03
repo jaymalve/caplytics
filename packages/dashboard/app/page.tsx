@@ -1,5 +1,6 @@
 import { formatUsd, usdToMicroDollars } from "@caplytics/core";
 import { listAgents, listEvents, querySpend } from "@caplytics/core/postgres";
+import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { EventTable } from "@/components/event-table";
 import { FilterBar } from "@/components/filter-bar";
@@ -15,7 +16,11 @@ export default async function DashboardPage({
 }: {
   searchParams: Promise<FilterSearchParams>;
 }) {
+  // The authoritative check. Middleware only redirects on a missing cookie, which proves nothing —
+  // this verifies the session itself, so a forged cookie reaches no data.
   const session = await auth();
+  if (session === null) redirect("/login");
+
   const params = await searchParams;
 
   return (
