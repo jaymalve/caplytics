@@ -94,13 +94,16 @@ export function attach<T extends AnyAgent>(
     // A fresh proxy per resolution, so the closure holds this call's request context.
     return proxyResolvedModel(
       resolved,
-      modelHooks({ budgetKey, requestContext: context }, hooks),
+      modelHooks({ budgetKey, requestContext: unwrapRequestContext(context) }, hooks),
     ) as never;
   };
 
   tools.install(async (context) => {
     const resolved = await resolveDynamic<Record<string, unknown>>(tools.original, context);
-    return wrapToolMap(resolved, toolHooks({ budgetKey, requestContext: context }, hooks));
+    return wrapToolMap(
+      resolved,
+      toolHooks({ budgetKey, requestContext: unwrapRequestContext(context) }, hooks),
+    );
   });
 
   return agent;
@@ -156,6 +159,19 @@ function proxyResolvedModel(resolved: unknown, hooks: ModelCallHooks): unknown {
   }
 
   return resolved;
+}
+
+/**
+ * Mastra hands resolvers `{ requestContext, mastra }`, not the request context itself.
+ *
+ * Passing the wrapper onwards silently breaks every consumer that calls `.get()` on it — which is
+ * how run identity and per-call metadata are carried (§6.1, architecture/run-scoping-api.md).
+ */
+function unwrapRequestContext(context: unknown): unknown {
+  if (typeof context !== "object" || context === null) return context;
+
+  const inner = Reflect.get(context, "requestContext");
+  return inner === undefined ? context : inner;
 }
 
 function isLanguageModel(value: unknown): value is object {

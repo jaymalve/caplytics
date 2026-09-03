@@ -7,7 +7,7 @@ import {
 } from "@caplytics/core";
 import type { AnyAgent, CaplyticsConfig } from "./adapters/mastra/agent-types.js";
 import { attachWithRecording } from "./adapters/mastra/attach-with-recording.js";
-import { RUN_ID_CONTEXT_KEY } from "./adapters/mastra/run-identity.js";
+import { createRequestContext } from "./adapters/mastra/call-metadata.js";
 import { type AgentMonitor, createAgentMonitor } from "./events/agent-monitor.js";
 import {
   type CaplyticsEventHandler,
@@ -54,8 +54,13 @@ export type Caplytics = {
    */
   run<T>(fn: () => T, options?: { metadata?: Record<string, string> }): T;
 
-  /** Entries to pass as `requestContext`, for callers who cannot wrap with `run()`. */
-  context(metadata?: Record<string, string>): Map<string, string>;
+  /**
+   * A `requestContext` carrying per-call metadata and a run identity (§6.1).
+   *
+   * For callers who cannot wrap with `run()`, and the only way to attach metadata to one specific
+   * call rather than to the agent.
+   */
+  context(metadata?: Record<string, string>): ReturnType<typeof createRequestContext>;
 
   /** Loads pricing. Awaited once before the first priced call so a run never starts unpriced. */
   warmPricing(): Promise<PriceTable>;
@@ -95,11 +100,7 @@ export function createCaplytics(options: CaplyticsOptions = {}): Caplytics {
       return withRun(context, fn);
     },
 
-    context: (metadata = {}) => {
-      const entries = new Map<string, string>(Object.entries(metadata));
-      entries.set(RUN_ID_CONTEXT_KEY, newRunId());
-      return entries;
-    },
+    context: (metadata = {}) => createRequestContext(metadata, newRunId()),
 
     warmPricing: async () => {
       table = await priceSource.load();
