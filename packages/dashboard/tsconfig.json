@@ -13,9 +13,11 @@
         "name": "next"
       }
     ],
+    // No source mappings for @caplytics/core here, deliberately. Next's bundler reads these paths
+    // too, and core's sources carry Node-ESM ".js" specifiers that webpack cannot resolve against
+    // ".ts" files — so a mapping that satisfies tsc breaks the build. Both resolve it through the
+    // package exports map instead, which is what a published consumer gets.
     "paths": {
-      "@caplytics/core": ["../core/src/index.ts"],
-      "@caplytics/core/postgres": ["../core/src/postgres/index.ts"],
       "@/*": ["./*"]
     },
     "declaration": false,
