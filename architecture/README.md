@@ -1,0 +1,14 @@
+# Architecture Decision Record
+
+[IMPLEMENTATION.md](../IMPLEMENTATION.md) is the index and states *what* Caplytics is. The files here are the detail record for each decision as it is implemented: the decision, the rationale, the alternatives considered.
+
+Per §9.1, this document links out; it does not duplicate.
+
+| Decision | Implements | Status |
+|---|---|---|
+| [mastra-interception-points.md](mastra-interception-points.md) | §1, §2 | Verified against `@mastra/core@1.55.0` |
+| [model-proxy-over-string-swap.md](model-proxy-over-string-swap.md) | §1, §3, §4.2, §5 | Accepted |
+| [per-call-metadata-transport.md](per-call-metadata-transport.md) | §6.1 | Accepted — amends §6.1 |
+| [tool-cost-derivation.md](tool-cost-derivation.md) | §1, §3 | Accepted — fills a §2.1 gap |
+| [budget-scope-and-state.md](budget-scope-and-state.md) | §4, §5 | Accepted — fills a §4 gap |
+| [core-subpath-exports.md](core-subpath-exports.md) | §8.1 | Accepted — refines §8.1 |
