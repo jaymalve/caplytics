@@ -1,8 +1,7 @@
-import { afterAll, describe, expect, test } from "bun:test";
-import { SQL } from "bun";
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { migrate } from "./migrate.js";
 import { DAILY_ROLLUP_VIEW, EVENTS_TABLE, MIGRATIONS_TABLE } from "./migrations.js";
-import type { SqlExecutor } from "./sql-executor.js";
+import { createTestPool } from "./test-database.js";
 
 /**
  * Runs against a real TimescaleDB — `docker compose up -d`, then set the URL.
@@ -11,22 +10,32 @@ import type { SqlExecutor } from "./sql-executor.js";
  * genuinely verified here: statements that parse fine as strings still fail against a real
  * hypertable, which is exactly what §10's open item 5 asked to settle.
  */
-const DATABASE_URL = process.env.CAPLYTICS_TEST_DATABASE_URL;
 
-const describeWithDatabase = DATABASE_URL === undefined ? describe.skip : describe;
+/**
+ * These tests drop and recreate the schema to prove creation, so they run in a Postgres schema of
+ * their own. Bun executes test files in parallel, and dropping the shared table would destroy the
+ * query tests' data mid-run — which it did, until this isolation was added.
+ */
+const TEST_SCHEMA = "caplytics_schema_test";
 
-const db = DATABASE_URL === undefined ? undefined : new SQL(DATABASE_URL);
+const pool = createTestPool(TEST_SCHEMA);
+const describeWithDatabase = pool === undefined ? describe.skip : describe;
 
-const sql: SqlExecutor = {
-  // biome-ignore lint/suspicious/noExplicitAny: bridging Bun's SQL to the driver-agnostic shape
-  query: async (text: string, params?: unknown[]): Promise<any> => {
-    const rows = await (db as SQL).unsafe(text, (params ?? []) as never);
-    return { rows: Array.isArray(rows) ? rows : [] };
-  },
-};
+// biome-ignore lint/style/noNonNullAssertion: the suite is skipped entirely when there is no pool
+const sql = pool!;
+
+beforeAll(async () => {
+  if (pool === undefined) return;
+
+  // Created through a separate connection, because the pool's own connections already point their
+  // search path at a schema that does not exist yet.
+  const bootstrap = createTestPool();
+  await bootstrap?.query(`CREATE SCHEMA IF NOT EXISTS ${TEST_SCHEMA}`);
+  await bootstrap?.end();
+});
 
 afterAll(async () => {
-  await db?.close();
+  await pool?.end();
 });
 
 describeWithDatabase("against a real TimescaleDB", () => {
@@ -52,8 +61,8 @@ describeWithDatabase("against a real TimescaleDB", () => {
   test("creates a hypertable partitioned on timestamp", async () => {
     const result = await sql.query<{ hypertable_name: string }>(
       `SELECT hypertable_name FROM timescaledb_information.hypertables
-       WHERE hypertable_name = $1`,
-      [EVENTS_TABLE],
+       WHERE hypertable_name = $1 AND hypertable_schema = $2`,
+      [EVENTS_TABLE, TEST_SCHEMA],
     );
 
     expect(result.rows).toHaveLength(1);
@@ -62,8 +71,8 @@ describeWithDatabase("against a real TimescaleDB", () => {
   test("creates the continuous aggregate §7 chose Timescale for", async () => {
     const result = await sql.query<{ view_name: string }>(
       `SELECT view_name FROM timescaledb_information.continuous_aggregates
-       WHERE view_name = $1`,
-      [DAILY_ROLLUP_VIEW],
+       WHERE view_name = $1 AND view_schema = $2`,
+      [DAILY_ROLLUP_VIEW, TEST_SCHEMA],
     );
 
     expect(result.rows).toHaveLength(1);
