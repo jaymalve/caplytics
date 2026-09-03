@@ -23,9 +23,11 @@ jobs:
 
       - run: bun run lint
 
-      - run: bun run typecheck
-
-      # Before test: the packaging invariants in test/ assert against real build output.
+      # Before typecheck, not only before test. The dashboard and the example resolve
+      # @caplytics/core and caplytics through their published exports maps, which point at dist/ —
+      # on a clean checkout there is nothing there to check against until the build has run.
       - run: bun run build
+
+      - run: bun run typecheck
 
       - run: bun test
