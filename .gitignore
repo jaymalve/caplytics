@@ -8,3 +8,6 @@ dist/
 coverage/
 .next/
 next-env.d.ts
+
+# Index written by a local diff tool; not part of the project.
+.diffling/
