@@ -19,3 +19,4 @@ Per §9.1, this document links out; it does not duplicate.
 | [per-tool-caps-deferred.md](per-tool-caps-deferred.md) | §2.1 | **Open** — deferred, not yet decided |
 | [query-layer-integration-gap.md](query-layer-integration-gap.md) | §6.2, §8.5 | Resolved — integration harness uses pg |
 | [table-sorting-and-cursors.md](table-sorting-and-cursors.md) | §8.2, §8.5 | Accepted — narrows §8.2 |
+| [dashboard-overview-layout.md](dashboard-overview-layout.md) | §8.2, §8.3 | Accepted — amends §8.2 |

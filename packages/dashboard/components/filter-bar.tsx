@@ -1,22 +1,33 @@
 "use client";
 
-import { CalendarIcon, CheckIcon, XIcon } from "lucide-react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { XIcon } from "lucide-react";
 import { useState } from "react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
 import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
+  DateRangePicker,
+  DateRangePickerCalendar,
+  DateRangePickerClear,
+  DateRangePickerContent,
+  DateRangePickerFooter,
+  DateRangePickerGrid,
+  DateRangePickerHeader,
+  DateRangePickerSelection,
+  DateRangePickerTrigger,
+} from "@/components/motion/date-range-picker";
+import {
+  MultiSelect,
+  MultiSelectContent,
+  MultiSelectEmpty,
+  MultiSelectInput,
+  MultiSelectItem,
+  MultiSelectList,
+  MultiSelectTrigger,
+  MultiSelectValue,
+} from "@/components/motion/multi-select";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { formatMetadataPair, parseMetadata } from "@/lib/filter-params";
+import { agentColor } from "@/lib/agent-colors";
+import { formatMetadataPair, parseAgents, parseMetadata } from "@/lib/filter-params";
+import { useFilterNavigation } from "@/lib/use-filter-navigation";
 
 export type FilterBarProps = {
   /** Distinct agent ids, read from the events themselves rather than a fixed list (§8.2). */
@@ -31,73 +42,87 @@ export type FilterBarProps = {
  * thing in the UI and another in the query.
  */
 export function FilterBar({ agents }: FilterBarProps) {
-  const router = useRouter();
-  const params = useSearchParams();
+  const { params, apply, replaceAll } = useFilterNavigation();
 
   const from = params.get("from") ?? "";
   const to = params.get("to") ?? "";
-  const agent = params.get("agent") ?? "";
+  const selectedAgents = parseAgents(params.getAll("agent"));
   const metadata = parseMetadata(params.getAll("meta"));
-
-  const [metadataDraft, setMetadataDraft] = useState("");
-
-  function apply(mutate: (next: URLSearchParams) => void): void {
-    const next = new URLSearchParams(params.toString());
-    mutate(next);
-    router.push(next.size === 0 ? "/" : `/?${next.toString()}`);
-  }
-
-  function addMetadata(): void {
-    const [key, ...rest] = metadataDraft.split(":");
-    const value = rest.join(":").trim();
-    if (key === undefined || key.trim().length === 0 || value.length === 0) return;
-
-    apply((next) => next.append("meta", formatMetadataPair(key.trim(), value)));
-    setMetadataDraft("");
-  }
-
-  const hasFilters = from !== "" || to !== "" || agent !== "" || Object.keys(metadata).length > 0;
+  const hasFilters =
+    from !== "" || to !== "" || selectedAgents.length > 0 || Object.keys(metadata).length > 0;
 
   return (
-    <div className="flex flex-col gap-3 border-b pb-4">
+    <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-2">
-        <DateField
-          label="From"
-          value={from}
-          onChange={(value) => apply((next) => setOrDelete(next, "from", value))}
-        />
-        <DateField
-          label="To"
-          value={to}
-          onChange={(value) => apply((next) => setOrDelete(next, "to", value))}
-        />
+        {/*
+          Uncontrolled, and keyed by the URL so it resets when the URL changes. The first click of
+          a range is only half a filter; committing it would reload the page between the two clicks.
+        */}
+        <DateRangePicker
+          key={`${from}|${to}`}
+          label="Date range"
+          defaultValue={from === "" ? null : { from, ...(to === "" ? {} : { to }) }}
+          onValueChange={(range) => {
+            if (range !== null && range.to === undefined) return;
+            apply((next) => {
+              setOrDelete(next, "from", range?.from ?? "");
+              setOrDelete(next, "to", range?.to ?? "");
+            });
+          }}
+          closeOnSelect
+        >
+          <DateRangePickerTrigger placeholder="All time" className="min-w-52" />
+          <DateRangePickerContent>
+            <DateRangePickerCalendar className="w-full rounded-none border-0">
+              <DateRangePickerHeader />
+              <DateRangePickerGrid />
+              <DateRangePickerFooter>
+                <div className="flex items-center justify-between gap-2">
+                  <DateRangePickerSelection />
+                  <DateRangePickerClear />
+                </div>
+              </DateRangePickerFooter>
+            </DateRangePickerCalendar>
+          </DateRangePickerContent>
+        </DateRangePicker>
 
-        <AgentPicker
-          agents={agents}
-          value={agent}
-          onChange={(value) => apply((next) => setOrDelete(next, "agent", value))}
-        />
-
-        <div className="flex items-center gap-2">
-          <Input
-            aria-label="Metadata filter"
-            placeholder="customerId:cus_18213"
-            className="w-56"
-            value={metadataDraft}
-            onChange={(changed) => setMetadataDraft(changed.target.value)}
-            onKeyDown={(pressed) => {
-              if (pressed.key !== "Enter") return;
-              pressed.preventDefault();
-              addMetadata();
-            }}
-          />
-          <Button variant="secondary" onClick={addMetadata} disabled={metadataDraft.length === 0}>
-            Add
-          </Button>
+        <div className="w-72">
+          <MultiSelect
+            value={selectedAgents}
+            onValueChange={(values) => replaceAll("agent", values)}
+          >
+            <MultiSelectTrigger>
+              <MultiSelectValue placeholder="All agents" />
+              <MultiSelectInput aria-label="Find an agent" />
+            </MultiSelectTrigger>
+            <MultiSelectContent>
+              <MultiSelectList ariaLabel="Agents">
+                {agents.map((agent) => (
+                  <MultiSelectItem key={agent} value={agent} textValue={agent}>
+                    <span className="flex items-center gap-2.5">
+                      <span
+                        aria-hidden="true"
+                        className="size-2.5 rounded-full"
+                        style={{ background: agentColor(agent, agents) }}
+                      />
+                      {agent}
+                    </span>
+                  </MultiSelectItem>
+                ))}
+                <MultiSelectEmpty>No agent has recorded spend yet.</MultiSelectEmpty>
+              </MultiSelectList>
+            </MultiSelectContent>
+          </MultiSelect>
         </div>
 
+        <MetadataInput
+          onAdd={(key, value) =>
+            apply((next) => next.append("meta", formatMetadataPair(key, value)))
+          }
+        />
+
         {hasFilters ? (
-          <Button variant="ghost" onClick={() => router.push("/")}>
+          <Button variant="ghost" onClick={() => apply((next) => clearAll(next))}>
             Clear all
           </Button>
         ) : null}
@@ -106,31 +131,60 @@ export function FilterBar({ agents }: FilterBarProps) {
       {Object.keys(metadata).length > 0 ? (
         <div className="flex flex-wrap gap-2">
           {Object.entries(metadata).map(([key, value]) => (
-            <Badge key={key} variant="secondary" className="gap-1 pr-1">
+            <span
+              key={key}
+              className="inline-flex items-center gap-1 rounded-full border bg-muted/50 py-0.5 pr-1 pl-2.5"
+            >
               <span className="font-mono text-xs">
                 {key}: {value}
               </span>
               <button
                 type="button"
                 aria-label={`Remove ${key} filter`}
-                className="rounded-sm p-0.5 hover:bg-muted"
+                className="rounded-full p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
                 onClick={() =>
-                  apply((next) => {
-                    const kept = next
-                      .getAll("meta")
-                      .filter((pair) => pair !== formatMetadataPair(key, value));
-                    next.delete("meta");
-                    for (const pair of kept) next.append("meta", pair);
-                  })
+                  replaceAll(
+                    "meta",
+                    params.getAll("meta").filter((pair) => pair !== formatMetadataPair(key, value)),
+                  )
                 }
               >
-                <XIcon className="h-3 w-3" />
+                <XIcon className="size-3" />
               </button>
-            </Badge>
+            </span>
           ))}
         </div>
       ) : null}
     </div>
+  );
+}
+
+/** Arbitrary `key:value` pairs per §6.1 — keys are business data, not a fixed dropdown. */
+function MetadataInput({ onAdd }: { onAdd: (key: string, value: string) => void }) {
+  const [draft, setDraft] = useState("");
+
+  function submit(): void {
+    const [key, ...rest] = draft.split(":");
+    const value = rest.join(":").trim();
+    if (key === undefined || key.trim().length === 0 || value.length === 0) return;
+
+    onAdd(key.trim(), value);
+    setDraft("");
+  }
+
+  return (
+    <Input
+      aria-label="Metadata filter"
+      placeholder="Filter by metadata, e.g. customerId:cus_18213"
+      className="w-80"
+      value={draft}
+      onChange={(changed) => setDraft(changed.target.value)}
+      onKeyDown={(pressed) => {
+        if (pressed.key !== "Enter") return;
+        pressed.preventDefault();
+        submit();
+      }}
+    />
   );
 }
 
@@ -139,99 +193,6 @@ function setOrDelete(params: URLSearchParams, key: string, value: string): void 
   else params.set(key, value);
 }
 
-function DateField({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <Button variant="outline" className="justify-start gap-2 font-normal">
-          <CalendarIcon className="h-4 w-4" />
-          {value === "" ? <span className="text-muted-foreground">{label}</span> : value}
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-auto p-0" align="start">
-        <Calendar
-          mode="single"
-          autoFocus
-          {...(value === "" ? {} : { selected: new Date(`${value}T00:00:00.000Z`) })}
-          onSelect={(date) => onChange(date === undefined ? "" : toIsoDate(date))}
-        />
-        {value === "" ? null : (
-          <div className="border-t p-2">
-            <Button variant="ghost" className="w-full" onClick={() => onChange("")}>
-              Clear {label.toLowerCase()}
-            </Button>
-          </div>
-        )}
-      </PopoverContent>
-    </Popover>
-  );
-}
-
-/** Populated from distinct `agentId` values, per §8.2 — never a hardcoded list. */
-function AgentPicker({
-  agents,
-  value,
-  onChange,
-}: {
-  agents: readonly string[];
-  value: string;
-  onChange: (value: string) => void;
-}) {
-  const [open, setOpen] = useState(false);
-
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button variant="outline" className="justify-start font-normal">
-          {value === "" ? <span className="text-muted-foreground">All agents</span> : value}
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-64 p-0" align="start">
-        <Command>
-          <CommandInput placeholder="Find an agent" />
-          <CommandList>
-            <CommandEmpty>No agent has recorded spend yet.</CommandEmpty>
-            <CommandGroup>
-              <CommandItem
-                onSelect={() => {
-                  onChange("");
-                  setOpen(false);
-                }}
-              >
-                All agents
-                {value === "" ? <CheckIcon className="ml-auto h-4 w-4" /> : null}
-              </CommandItem>
-              {agents.map((id) => (
-                <CommandItem
-                  key={id}
-                  value={id}
-                  onSelect={() => {
-                    onChange(id);
-                    setOpen(false);
-                  }}
-                >
-                  {id}
-                  {value === id ? <CheckIcon className="ml-auto h-4 w-4" /> : null}
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
-  );
-}
-
-function toIsoDate(date: Date): string {
-  return new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
-    .toISOString()
-    .slice(0, 10);
+function clearAll(params: URLSearchParams): void {
+  for (const key of ["from", "to", "agent", "meta"]) params.delete(key);
 }

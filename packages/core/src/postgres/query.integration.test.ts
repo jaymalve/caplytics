@@ -5,6 +5,7 @@ import { insertEvents } from "./insert-events.js";
 import { migrate } from "./migrate.js";
 import { type EventCursor, listEvents } from "./query-events.js";
 import { querySpend } from "./query-spend.js";
+import { querySpendByName } from "./query-spend-by-name.js";
 import { createTestPool, testNamespace } from "./test-database.js";
 
 const pool = createTestPool();
@@ -142,6 +143,40 @@ describeWithDatabase("the query layer against real data", () => {
       const spend = await querySpend(sql, { agentId: `absent-${NS}` });
 
       expect(spend).toEqual({ totalCost: 0, callCount: 0, byAgent: {}, unpricedCount: 0 });
+    });
+
+    test("matches any of several agents", async () => {
+      const spend = await querySpend(sql, {
+        metadata: SUITE,
+        agentId: [SUPPORT, BILLING],
+        from: "2026-07-01",
+        to: "2026-08-01",
+      });
+
+      expect(spend.totalCost).toBe(7);
+    });
+  });
+
+  describe("querySpendByName", () => {
+    test("totals each name, most expensive first", async () => {
+      const byName = await querySpendByName(sql, {
+        metadata: SUITE,
+        from: "2026-07-01",
+        to: "2026-08-01",
+      });
+
+      expect(byName).toEqual([
+        { name: "claude-opus-4-8", type: "model_call", totalCost: 7, callCount: 4 },
+      ]);
+    });
+
+    test("applies the same filter as querySpend, so the two never disagree", async () => {
+      const filter = { metadata: SUITE, agentId: BILLING };
+      const byName = await querySpendByName(sql, filter);
+
+      expect(byName.reduce((total, row) => total + row.totalCost, 0)).toBe(
+        (await querySpend(sql, filter)).totalCost,
+      );
     });
   });
 

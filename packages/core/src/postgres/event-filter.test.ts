@@ -26,6 +26,17 @@ describe("building the WHERE clause", () => {
     expect(where.params).toEqual(["support-agent", "run_1"]);
   });
 
+  test("matches any of several agents", () => {
+    const where = buildWhere({ agentId: ["support-agent", "billing-agent"] });
+
+    expect(where.sql).toBe("agent_id = ANY($1::text[])");
+    expect(where.params).toEqual([["support-agent", "billing-agent"]]);
+  });
+
+  test("ignores an empty agent list rather than matching nothing", () => {
+    expect(buildWhere({ agentId: [] })).toEqual({ sql: "TRUE", params: [] });
+  });
+
   // Containment is one indexable predicate the GIN index serves; per-key equality would be N.
   test("uses jsonb containment for metadata", () => {
     const where = buildWhere({ metadata: { customerId: "cus_18213" } });

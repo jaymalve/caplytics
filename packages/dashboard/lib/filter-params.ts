@@ -10,7 +10,8 @@ import type { EventFilter } from "@caplytics/core/postgres";
 export type FilterSearchParams = {
   from?: string;
   to?: string;
-  agent?: string;
+  /** Repeatable: several agents are matched as "any of" (§8.4 — `EventFilter.agentId` takes a list). */
+  agent?: string | string[];
   /** Repeatable `key:value` pairs — arbitrary keys, per §6.1. */
   meta?: string | string[];
   /** Opaque keyset position (§8.5); decoded by lib/cursor.ts, never built by hand. */
@@ -21,11 +22,12 @@ const METADATA_SEPARATOR = ":";
 
 export function toEventFilter(params: FilterSearchParams): EventFilter {
   const metadata = parseMetadata(params.meta);
+  const agents = parseAgents(params.agent);
 
   return {
     ...(isPresent(params.from) ? { from: params.from } : {}),
     ...(isPresent(params.to) ? { to: exclusiveEndOfDay(params.to) } : {}),
-    ...(isPresent(params.agent) ? { agentId: params.agent } : {}),
+    ...(agents.length > 0 ? { agentId: agents } : {}),
     ...(Object.keys(metadata).length > 0 ? { metadata } : {}),
   };
 }
@@ -58,6 +60,11 @@ export function parseMetadata(raw: string | string[] | undefined): Record<string
   }
 
   return metadata;
+}
+
+export function parseAgents(raw: string | string[] | undefined): string[] {
+  const agents = raw === undefined ? [] : Array.isArray(raw) ? raw : [raw];
+  return agents.map((agent) => agent.trim()).filter((agent) => agent.length > 0);
 }
 
 export function formatMetadataPair(key: string, value: string): string {

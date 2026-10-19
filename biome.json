@@ -48,6 +48,25 @@
       "linter": {
         "enabled": false
       }
+    },
+    {
+      "includes": [
+        "packages/dashboard/components/motion/**",
+        "packages/dashboard/components/charts/**",
+        "packages/dashboard/lib/hooks/**",
+        "packages/dashboard/lib/ease.ts",
+        "packages/dashboard/lib/presence-gate.tsx",
+        "packages/dashboard/lib/touch.ts"
+      ],
+      "linter": {
+        "enabled": false
+      },
+      "formatter": {
+        "enabled": false
+      },
+      "assist": {
+        "enabled": false
+      }
     }
   ],
   "css": {
