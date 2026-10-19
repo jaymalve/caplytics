@@ -70,6 +70,11 @@
   --sidebar-accent-foreground: oklch(0.21 0.03 155);
   --sidebar-border: oklch(0.87 0.008 90);
   --sidebar-ring: oklch(0.3 0.06 155);
+  /* foglamp.dev's layered hairline shadows: a 0.5px ring standing in for a border, plus a soft lift. */
+  --shadow-card: 0 0 0 0.5px #0000000f, 0 0.5px 2px -0.5px #0000000f, 0 1px 4px 0 #0000000a;
+  --shadow-float: 0 0 0 0.5px #00000014, 0 4px 12px -2px #0000001a, 0 12px 32px -8px #0000001f;
+  --shadow-primary: 0 0 0 0.5px #0009, 0 0.5px 2px -0.5px #0006, 0 2px 4px 0 #0000002e;
+  --shadow-secondary: 0 0 0 0.5px #00000014, 0 0.5px 2px -0.5px #00000014, 0 2px 4px 0 #0000000d;
 }
 
 @layer base {

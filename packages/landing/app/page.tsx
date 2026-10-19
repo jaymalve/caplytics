@@ -1,45 +1,83 @@
-import { FeatureSection } from "@/components/feature-section";
+import {
+  Coins,
+  Gauge,
+  Layers,
+  ListChecks,
+  Scale,
+  ShieldX,
+  Tags,
+  TrendingDown,
+  Users,
+} from "lucide-react";
+import { ClosingCta } from "@/components/closing-cta";
+import { Faq } from "@/components/faq";
+import { FeatureRow } from "@/components/feature-row";
 import { Footer } from "@/components/footer";
 import { Hero } from "@/components/hero";
-import { BudgetMockup } from "@/components/mockups/budget-mockup";
-import { EventTableMockup } from "@/components/mockups/event-table-mockup";
 import { Nav } from "@/components/nav";
+import { ProductShot } from "@/components/product-shot";
+import { BudgetVisual } from "@/components/visuals/budget-visual";
+import { CostVisual } from "@/components/visuals/cost-visual";
+import { EventsVisual } from "@/components/visuals/events-visual";
+import { WorksWith } from "@/components/works-with";
+import { links } from "@/lib/links";
 
+// The hero follows usefr.com; everything after it follows foglamp.dev.
 export default function Home() {
   return (
-    <main>
-      {/* The wordmark runs near edge to edge, as on usefr.com; the content below keeps a reading width. */}
-      <div className="mx-auto max-w-[1680px]">
-        <Nav />
-        <Hero />
-      </div>
-      <div className="mx-auto max-w-6xl">
-        <FeatureSection
-          headline={
-            <>
-              Stop the overspend
-              <br />
-              before it happens.
-            </>
-          }
-          description="Every model and tool call is checked against the budget before it fires. Hard caps block outright; degradation ladders downgrade the model or trim output as spend climbs — no silent runaway bill at the end of a run."
-        >
-          <BudgetMockup />
-        </FeatureSection>
-        <FeatureSection
-          headline={
-            <>
-              Know exactly what
-              <br />
-              you&apos;re spending, and on what.
-            </>
-          }
-          description="Every call emits a structured event — tokens, cost, budget remaining. Filter by agent, date range, or any metadata key you've tagged: customer, channel, task."
-        >
-          <EventTableMockup />
-        </FeatureSection>
-        <Footer />
-      </div>
-    </main>
+    <>
+      <Nav />
+      <main>
+        <div className="mx-auto max-w-[1680px]">
+          <Hero />
+        </div>
+        <ProductShot />
+        <WorksWith />
+        <div className="mx-auto mt-12 w-full max-w-7xl px-5 sm:mt-20 sm:px-8">
+          <FeatureRow
+            id="budgets"
+            chips={[
+              { icon: ShieldX, hue: "red", label: "Hard caps" },
+              { icon: TrendingDown, hue: "orange", label: "Degradation" },
+              { icon: Gauge, hue: "violet", label: "Mid-stream" },
+            ]}
+            title="Stop runaway runs"
+            description="Every call is checked against the run's budget before it fires. Drop to a cheaper model as spend climbs, then block before the cap."
+            cta={{ label: "Set a budget", href: links.sdk }}
+          >
+            <BudgetVisual />
+          </FeatureRow>
+          <FeatureRow
+            id="costs"
+            chips={[
+              { icon: Users, hue: "green", label: "Agents" },
+              { icon: Tags, hue: "sky", label: "Customers" },
+              { icon: Coins, hue: "yellow", label: "Models" },
+            ]}
+            title="Know what every customer costs"
+            description="Tag any call with metadata, then total spend by agent, customer, or anything else you tagged, over any time window."
+            cta={{ label: "See attribution", href: links.sdk }}
+          >
+            <CostVisual />
+          </FeatureRow>
+          <FeatureRow
+            id="events"
+            chips={[
+              { icon: ListChecks, hue: "sky", label: "Events" },
+              { icon: Scale, hue: "orange", label: "Estimate vs actual" },
+              { icon: Layers, hue: "violet", label: "Cache tokens" },
+            ]}
+            title="See every call"
+            description="One structured event per model and tool call, priced from the provider's own usage report, in a dashboard you host."
+            cta={{ label: "Self-host the dashboard", href: links.selfHost }}
+          >
+            <EventsVisual />
+          </FeatureRow>
+        </div>
+        <Faq />
+        <ClosingCta />
+      </main>
+      <Footer />
+    </>
   );
 }
