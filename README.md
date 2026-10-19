@@ -92,6 +92,23 @@ never priced at zero, because "free" and "unmeasured" must not look alike.
 
 ## Dashboard
 
+Self-host with one command — brings up TimescaleDB and the dashboard together, migrated and ready:
+
+```bash
+cp .env.example .env   # fill in AUTH_SECRET, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
+docker compose --profile dashboard up --build
+```
+
+Open http://localhost:3000. `ALLOWED_EMAIL_DOMAINS` is optional in `.env`, and leaving it unset means
+**any Google account can sign in** — set it unless you mean that.
+
+The schema is applied automatically on boot (the image runs `packages/dashboard/scripts/migrate.mjs`
+before starting the server), so there is no separate migration step. See [architecture/one-click-self-host.md](architecture/one-click-self-host.md)
+for how this fits together, and run `docker compose up -d --wait` without the profile flag if you only
+want the database (what `bun run db:up` does for local dev and tests).
+
+Running the dashboard image against a database you manage yourself instead of Compose:
+
 ```bash
 docker run -p 3000:3000 \
   -e DATABASE_URL=postgres://... \
@@ -100,18 +117,6 @@ docker run -p 3000:3000 \
   -e GOOGLE_CLIENT_SECRET=... \
   -e ALLOWED_EMAIL_DOMAINS=yourcompany.com \
   caplytics/dashboard
-```
-
-`ALLOWED_EMAIL_DOMAINS` is optional, and leaving it unset means **any Google account can sign in**.
-Set it unless you mean that.
-
-Apply the schema once against a TimescaleDB:
-
-```ts
-import { migrate } from "@caplytics/core/postgres";
-import { Pool } from "pg";
-
-await migrate(new Pool({ connectionString: process.env.DATABASE_URL }));
 ```
 
 ## Packages

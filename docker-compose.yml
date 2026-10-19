@@ -1,4 +1,8 @@
-# Local and CI Postgres for the query layer (§7). Not the dashboard image (§8.7).
+# `timescale` has no profile, so `bun run db:up` (dev/CI, §7) starts only the database, same as
+# before. The `dashboard` service is opt-in behind the `dashboard` profile — `docker compose
+# --profile dashboard up --build` is the one-command self-host (§8.7): builds the image, waits for
+# the database, and migrates on boot (the Dockerfile's CMD runs packages/dashboard/scripts/migrate.mjs),
+# with nothing extra to run by hand.
 services:
   timescale:
     image: timescale/timescaledb:2.17.2-pg16
@@ -13,3 +17,30 @@ services:
       interval: 2s
       timeout: 5s
       retries: 30
+    volumes:
+      - timescale-data:/var/lib/postgresql/data
+
+  dashboard:
+    profiles: ["dashboard"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      timescale:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: "postgres://caplytics:caplytics@timescale:5432/caplytics"
+      # Not `${VAR:?message}`: Compose interpolates every service's environment on every invocation
+      # regardless of active profile, so a required-var failure here would break plain `docker
+      # compose up` (what `bun run db:up` uses, with none of these set) even though `dashboard` isn't
+      # starting. `lib/env.ts` already refuses to boot without these — one required-ness check, at
+      # the boundary that actually needs the value.
+      AUTH_SECRET: "${AUTH_SECRET:-}"
+      GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID:-}"
+      GOOGLE_CLIENT_SECRET: "${GOOGLE_CLIENT_SECRET:-}"
+      ALLOWED_EMAIL_DOMAINS: "${ALLOWED_EMAIL_DOMAINS:-}"
+
+volumes:
+  timescale-data:
