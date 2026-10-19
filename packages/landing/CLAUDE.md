@@ -10,7 +10,7 @@ It imports nothing from `@caplytics/core` or `caplytics-dashboard` — no databa
 
 ## Content is illustrative, not live
 
-The budget and event-table mockups (`components/mockups/`) are hand-built JSX dressed as a product screenshot, not a connection to real data. If the dashboard's actual UI changes shape, these drift — there is no shared component between the two apps to keep them in sync by construction. Revisit this if that drift becomes a real maintenance cost.
+The product shot and feature visuals (`components/product-shot.tsx`, `components/visuals/`) are hand-built JSX dressed as the dashboard, not a connection to real data. They share one set of illustrative agents, customers and calls in `components/demo/data.ts`, so the numbers agree across the page. If the dashboard's actual UI changes shape, these drift — there is no shared component between the two apps to keep them in sync by construction. Revisit this if that drift becomes a real maintenance cost.
 
 ## UI
 
