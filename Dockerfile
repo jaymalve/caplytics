@@ -47,6 +47,18 @@ RUN addgroup --system --gid 1001 caplytics \
 # public directory are the two things it does not copy for you.
 COPY --from=builder --chown=caplytics:caplytics /repo/packages/dashboard/.next/standalone ./
 COPY --from=builder --chown=caplytics:caplytics /repo/packages/dashboard/.next/static ./packages/dashboard/.next/static
+# Plain script, run before the server starts (see CMD) — not part of the Next build, so `pg`
+# resolves from the standalone output's node_modules without going through webpack, which `pg`'s
+# `pgpass` dependency (needs `fs`) does not survive. `@caplytics/core`'s dist is copied explicitly:
+# webpack inlined it into the route bundle at build time, so standalone tracing never copied it as a
+# runtime dependency, and the script imports it by relative path instead. `npm install` here (not
+# hand-copying bun's symlinked store) picks up whatever core's package.json actually declares — zod
+# today, anything it adds later — without this Dockerfile needing to track it separately.
+COPY --from=builder --chown=caplytics:caplytics /repo/packages/dashboard/scripts ./packages/dashboard/scripts
+COPY --from=builder --chown=caplytics:caplytics /repo/packages/core/dist ./packages/core/dist
+COPY --from=builder --chown=caplytics:caplytics /repo/packages/core/package.json ./packages/core/package.json
+RUN npm install --prefix packages/core --omit=dev \
+ && chown -R caplytics:caplytics packages/core/node_modules
 
 USER caplytics
 EXPOSE 3000
@@ -55,4 +67,6 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||3000)+'/login').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
-CMD ["node", "packages/dashboard/server.js"]
+# Migrating before serving is what makes self-host a single `docker compose up` — see
+# architecture/one-click-self-host.md.
+CMD ["sh", "-c", "node packages/dashboard/scripts/migrate.mjs && node packages/dashboard/server.js"]
