@@ -23,7 +23,11 @@
     "declaration": false,
     "declarationMap": false,
     "baseUrl": ".",
-    "exactOptionalPropertyTypes": false
+    "exactOptionalPropertyTypes": false,
+    // Vendored beUI source (components/motion, components/charts) indexes arrays unchecked, and
+    // tsc checks whatever is imported regardless of `exclude`. Relaxed package-wide for the same
+    // reason as the line above; see architecture/dashboard-overview-layout.md.
+    "noUncheckedIndexedAccess": false
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
   "exclude": ["node_modules"]

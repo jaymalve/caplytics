@@ -3,7 +3,11 @@ export type EventFilter = {
   readonly from?: string;
   /** Exclusive upper bound, so adjacent ranges neither overlap nor drop an event between them. */
   readonly to?: string;
-  readonly agentId?: string;
+  /**
+   * One agent, or any of several. A list lets the dashboard's multi-select map onto the filter
+   * unmodified (§8.4); an empty list filters nothing, the same as leaving it out.
+   */
+  readonly agentId?: string | readonly string[];
   readonly runId?: string;
   /**
    * Every pair must match (§6.2). Keys are arbitrary business data — caplytics does not validate
@@ -35,7 +39,10 @@ export function buildWhere(filter: EventFilter, startAt = 1): WhereClause {
 
   if (filter.from !== undefined) conditions.push(`timestamp >= ${bind(filter.from)}`);
   if (filter.to !== undefined) conditions.push(`timestamp < ${bind(filter.to)}`);
-  if (filter.agentId !== undefined) conditions.push(`agent_id = ${bind(filter.agentId)}`);
+  if (typeof filter.agentId === "string") conditions.push(`agent_id = ${bind(filter.agentId)}`);
+  else if (filter.agentId !== undefined && filter.agentId.length > 0) {
+    conditions.push(`agent_id = ANY(${bind(filter.agentId)}::text[])`);
+  }
   if (filter.runId !== undefined) conditions.push(`run_id = ${bind(filter.runId)}`);
 
   // Containment rather than per-key equality: one indexable predicate the GIN jsonb_path_ops index
