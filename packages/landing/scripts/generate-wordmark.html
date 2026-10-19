@@ -1,0 +1,71 @@
+<!doctype html>
+<!--
+  Regenerates public/wordmark/*.svg. Open this file in a browser and save each
+  printed SVG over the matching file.
+
+  Bun has no canvas, so this runs in a browser: it draws a word in Gloock,
+  samples the glyphs on a grid and emits one bar per filled run in each column.
+  The grid matches usefr.com's hero, with 37 cells per em and bars filling ~70%
+  of a cell.
+-->
+<meta charset="utf-8" />
+<title>Wordmark generator</title>
+<link href="https://fonts.googleapis.com/css2?family=Gloock&display=block" rel="stylesheet" />
+<body style="font-family: system-ui; padding: 24px">
+  <pre id="out" style="white-space: pre-wrap; word-break: break-all"></pre>
+  <script>
+    const FAMILY = "Gloock";
+    const SIZE = 297;
+    const CELL = SIZE / 37;
+    const BAR = CELL * 0.7037;
+    const TRACKING = -SIZE * 0.025;
+    // Alpha cutoff for a filled cell. Lower keeps more of the hairlines as stubs.
+    const ALPHA_ON = 110;
+
+    function toBars(word) {
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+      const font = `400 ${SIZE}px "${FAMILY}"`;
+      ctx.font = font;
+      ctx.letterSpacing = `${TRACKING}px`;
+      const m = ctx.measureText(word);
+      const ascent = Math.ceil(m.actualBoundingBoxAscent);
+      canvas.width = Math.ceil(m.width + CELL * 2);
+      canvas.height = ascent + Math.ceil(m.actualBoundingBoxDescent) + 4;
+      // Resizing a canvas resets its context state.
+      ctx.font = font;
+      ctx.letterSpacing = `${TRACKING}px`;
+      ctx.fillText(word, CELL * 0.5, ascent + 2);
+
+      const alpha = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+      const cols = Math.floor(canvas.width / CELL);
+      const rows = Math.ceil(canvas.height / CELL);
+      const r = (n) => +n.toFixed(2);
+      let d = "";
+      let right = 0;
+      for (let i = 0; i < cols; i++) {
+        const x = Math.round((i + 0.5) * CELL);
+        let start = -1;
+        for (let j = 0; j <= rows; j++) {
+          const y = Math.min(canvas.height - 1, Math.round((j + 0.5) * CELL));
+          const on = j < rows && alpha[(y * canvas.width + x) * 4 + 3] > ALPHA_ON;
+          if (on && start < 0) start = j;
+          if (!on && start >= 0) {
+            const x0 = r(i * CELL);
+            const x1 = r(i * CELL + BAR);
+            d += `M${x0} ${r(start * CELL)}H${x1}V${r(j * CELL)}H${x0}Z`;
+            right = Math.max(right, x1);
+            start = -1;
+          }
+        }
+      }
+      return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${r(right)} ${r(rows * CELL)}"><title>${word}</title><path d="${d}" fill="#000"/></svg>`;
+    }
+
+    document.fonts.load(`${SIZE}px "${FAMILY}"`).then(() => {
+      document.getElementById("out").textContent = ["CAP", "LYTICS"]
+        .map((word) => `── ${word.toLowerCase()}.svg ──\n${toBars(word)}`)
+        .join("\n\n");
+    });
+  </script>
+</body>
