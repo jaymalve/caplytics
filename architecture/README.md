@@ -21,3 +21,4 @@ Per §9.1, this document links out; it does not duplicate.
 | [table-sorting-and-cursors.md](table-sorting-and-cursors.md) | §8.2, §8.5 | Accepted — narrows §8.2 |
 | [one-click-self-host.md](one-click-self-host.md) | §8.7 | Accepted — extends §8.7 |
 | [dashboard-overview-layout.md](dashboard-overview-layout.md) | §8.2, §8.3 | Accepted — amends §8.2 |
+| [landing-package.md](landing-package.md) | — | Accepted — adds a package not in IMPLEMENTATION.md |

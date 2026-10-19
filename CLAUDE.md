@@ -9,6 +9,7 @@ This file covers conventions that apply everywhere. Package-level `CLAUDE.md` fi
 ```
 packages/core        → @caplytics/core   event schema, cost model, budget ledger, query layer
 packages/caplytics   → caplytics         the SDK: attach(), enforcement, framework adapters
+packages/landing     → caplytics-landing the public marketing site (static, no auth)
 ```
 
 `caplytics-dashboard` (Next.js) arrives with the dashboard work in §8.
