@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { parseMetadata, toEventFilter } from "./filter-params";
+import { parseAgents, parseMetadata, toEventFilter } from "./filter-params";
 
 describe("toEventFilter", () => {
   test("an empty URL filters nothing", () => {
@@ -26,8 +26,25 @@ describe("toEventFilter", () => {
   test("maps agent and metadata onto the query's own shape", () => {
     const filter = toEventFilter({ agent: "support-agent", meta: ["customerId:cus_1"] });
 
-    expect(filter.agentId).toBe("support-agent");
+    expect(filter.agentId).toEqual(["support-agent"]);
     expect(filter.metadata).toEqual({ customerId: "cus_1" });
+  });
+});
+
+describe("parseAgents", () => {
+  test("reads repeated agents as any-of", () => {
+    expect(toEventFilter({ agent: ["support-agent", "billing-agent"] }).agentId).toEqual([
+      "support-agent",
+      "billing-agent",
+    ]);
+  });
+
+  test("accepts a single agent as a bare string", () => {
+    expect(parseAgents("support-agent")).toEqual(["support-agent"]);
+  });
+
+  test("drops blank entries", () => {
+    expect(parseAgents(["", " ", "billing-agent"])).toEqual(["billing-agent"]);
   });
 });
 

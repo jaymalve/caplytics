@@ -17,4 +17,5 @@ export {
   listEvents,
 } from "./query-events.js";
 export { querySpend, type SpendSummary } from "./query-spend.js";
+export { type NameSpend, querySpendByName } from "./query-spend-by-name.js";
 export type { SqlExecutor, SqlRows } from "./sql-executor.js";

@@ -1,16 +1,24 @@
-import { formatUsd, usdToMicroDollars } from "@caplytics/core";
-import { listAgents, listEvents, querySpend } from "@caplytics/core/postgres";
+import { listAgents, listEvents, querySpend, querySpendByName } from "@caplytics/core/postgres";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
+import { DashboardSidebar } from "@/components/dashboard-sidebar";
 import { EventTable } from "@/components/event-table";
 import { FilterBar } from "@/components/filter-bar";
-import { Button } from "@/components/ui/button";
+import { SpendByAgentChart } from "@/components/spend-by-agent-chart";
+import { SpendByNameChart } from "@/components/spend-by-name-chart";
+import { SummaryCards } from "@/components/summary-cards";
 import { Skeleton } from "@/components/ui/skeleton";
 import { decodeCursor } from "@/lib/cursor";
 import { database } from "@/lib/database";
 import { type FilterSearchParams, toEventFilter } from "@/lib/filter-params";
+import { nextPageHref } from "@/lib/next-page-href";
 import { auth, signOut } from "../auth";
 
+/**
+ * One page (§8.2), aggregates above the rows — see architecture/dashboard-overview-layout.md.
+ * Every figure on it is computed by `@caplytics/core/postgres` from the same `EventFilter`, so a
+ * card and the rows beneath it can never disagree about what was filtered.
+ */
 export default async function DashboardPage({
   searchParams,
 }: {
@@ -22,101 +30,113 @@ export default async function DashboardPage({
   if (session === null) redirect("/login");
 
   const params = await searchParams;
-
-  return (
-    <main className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-8">
-      <header className="flex items-center justify-between border-b pb-4">
-        <div>
-          <h1 className="text-xl font-semibold">Caplytics</h1>
-          <p className="text-sm text-muted-foreground">Agent spend, by run and by call.</p>
-        </div>
-
-        <form
-          action={async () => {
-            "use server";
-            await signOut({ redirectTo: "/login" });
-          }}
-          className="flex items-center gap-3"
-        >
-          <span className="text-sm text-muted-foreground">{session?.user?.email}</span>
-          <Button type="submit" variant="outline">
-            Sign out
-          </Button>
-        </form>
-      </header>
-
-      {/* Suspense per section, so a slow aggregate does not hold back the filter controls. */}
-      <Suspense fallback={<Skeleton className="h-16 w-full" />}>
-        <Filters />
-      </Suspense>
-
-      <Suspense fallback={<SummarySkeleton />}>
-        <Summary params={params} />
-      </Suspense>
-
-      <Suspense fallback={<TableSkeleton />}>
-        <Events params={params} />
-      </Suspense>
-    </main>
-  );
-}
-
-async function Filters() {
   // Every agent that has spent, not only those matching the current filter — narrowing the list to
   // the active filter would make it impossible to switch to any other agent.
   const agents = await listAgents(database());
 
-  return <FilterBar agents={agents} />;
-}
-
-/**
- * §8.2 has no summary cards — the table carries the totals. This is the filtered aggregate only,
- * which is what §6.2's `query()` answers and what the table below it will page through.
- */
-async function Summary({ params }: { params: FilterSearchParams }) {
-  const spend = await querySpend(database(), toEventFilter(params));
-
   return (
-    <section className="flex flex-wrap items-baseline gap-x-8 gap-y-2 text-sm">
-      <Figure label="Total" value={formatUsd(usdToMicroDollars(spend.totalCost))} />
-      <Figure label="Calls" value={String(spend.callCount)} />
-      {spend.unpricedCount > 0 ? (
-        <Figure
-          label="Unpriced"
-          value={String(spend.unpricedCount)}
-          // Surfaced rather than folded into the total: those calls cost money nobody can attribute.
-          hint="not included in the total"
-        />
-      ) : null}
-    </section>
+    <DashboardSidebar
+      agents={agents}
+      email={session.user?.email ?? ""}
+      signOut={async () => {
+        "use server";
+        await signOut({ redirectTo: "/login" });
+      }}
+    >
+      <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-6 py-8">
+        <header className="flex flex-col gap-1">
+          <h1 className="text-2xl font-semibold tracking-tight">Agent spend</h1>
+          <p className="text-sm text-muted-foreground">
+            What your agents cost, by agent, by model and by call.
+          </p>
+        </header>
+
+        <FilterBar agents={agents} />
+
+        {/* Suspense per section, so a slow aggregate does not hold back the rows, or vice versa. */}
+        <Suspense fallback={<OverviewSkeleton />}>
+          <Overview params={params} agents={agents} />
+        </Suspense>
+
+        <section className="flex flex-col gap-3">
+          <h2 className="text-sm font-medium">Events</h2>
+          <Suspense fallback={<TableSkeleton />}>
+            <Events params={params} agents={agents} />
+          </Suspense>
+        </section>
+      </main>
+    </DashboardSidebar>
   );
 }
 
-function Figure({ label, value, hint }: { label: string; value: string; hint?: string }) {
+async function Overview({
+  params,
+  agents,
+}: {
+  params: FilterSearchParams;
+  agents: readonly string[];
+}) {
+  const filter = toEventFilter(params);
+  const [spend, byName] = await Promise.all([
+    querySpend(database(), filter),
+    querySpendByName(database(), filter),
+  ]);
+
   return (
-    <div className="flex flex-col">
-      <span className="text-xs uppercase tracking-wide text-muted-foreground">{label}</span>
-      <span className="font-mono text-lg">{value}</span>
-      {hint === undefined ? null : <span className="text-xs text-muted-foreground">{hint}</span>}
-    </div>
+    <>
+      <SummaryCards
+        totalCost={spend.totalCost}
+        callCount={spend.callCount}
+        unpricedCount={spend.unpricedCount}
+      />
+      <div className="grid gap-4 lg:grid-cols-2">
+        <SpendByAgentChart byAgent={spend.byAgent} allAgents={agents} />
+        <SpendByNameChart byName={byName} />
+      </div>
+    </>
   );
 }
 
-async function Events({ params }: { params: FilterSearchParams }) {
+async function Events({
+  params,
+  agents,
+}: {
+  params: FilterSearchParams;
+  agents: readonly string[];
+}) {
+  const cursor = decodeCursor(params.cursor);
   const page = await listEvents(database(), {
     ...toEventFilter(params),
-    ...(decodeCursor(params.cursor) === undefined
-      ? {}
-      : // biome-ignore lint/style/noNonNullAssertion: guarded by the check above
-        { cursor: decodeCursor(params.cursor)! }),
+    ...(cursor === undefined ? {} : { cursor }),
   });
 
   return (
     <EventTable
       events={page.events}
-      nextCursor={page.nextCursor}
-      searchParams={params as Record<string, string | string[] | undefined>}
+      allAgents={agents}
+      nextPageHref={
+        page.nextCursor === undefined
+          ? undefined
+          : nextPageHref(params as Record<string, string | string[] | undefined>, page.nextCursor)
+      }
     />
+  );
+}
+
+function OverviewSkeleton() {
+  return (
+    <>
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {Array.from({ length: 4 }, (_, card) => (
+          // biome-ignore lint/suspicious/noArrayIndexKey: fixed-length placeholder cards
+          <Skeleton key={card} className="h-24 rounded-xl" />
+        ))}
+      </div>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Skeleton className="h-80 rounded-xl" />
+        <Skeleton className="h-80 rounded-xl" />
+      </div>
+    </>
   );
 }
 
@@ -127,15 +147,6 @@ function TableSkeleton() {
         // biome-ignore lint/suspicious/noArrayIndexKey: fixed-length placeholder rows
         <Skeleton key={row} className="h-10 w-full" />
       ))}
-    </div>
-  );
-}
-
-function SummarySkeleton() {
-  return (
-    <div className="flex gap-8">
-      <Skeleton className="h-12 w-28" />
-      <Skeleton className="h-12 w-20" />
     </div>
   );
 }

@@ -30,8 +30,8 @@ Keeping next-auth out of the middleware also keeps its config out of the edge bu
 
 ## UI
 
-shadcn components for anything shadcn provides. Skeleton loaders only — no spinners, anywhere. `useEffect` is for synchronising with an external system, not for fetching data or deriving state (§9.3).
+beUI (`@beui/*` in `components.json`) for the components listed in [architecture/dashboard-overview-layout.md](../../architecture/dashboard-overview-layout.md); shadcn for the rest. Skeleton loaders only — no spinners, anywhere. `useEffect` is for synchronising with an external system, not for fetching data or deriving state (§9.3).
 
-`components/ui/` is vendored: `shadcn add` regenerates it, so it is excluded from linting and this package relaxes `exactOptionalPropertyTypes`. Do not hand-edit those files expecting the change to survive.
+`components/ui/`, `components/motion/`, `components/charts/` and beUI's helpers in `lib/` (`hooks/`, `ease.ts`, `presence-gate.tsx`, `touch.ts`) are vendored: `shadcn add` regenerates them, so they are excluded from linting and this package relaxes `exactOptionalPropertyTypes` and `noUncheckedIndexedAccess`. Do not hand-edit those files expecting the change to survive.
 
 The table is deliberately not sortable — see [architecture/table-sorting-and-cursors.md](../../architecture/table-sorting-and-cursors.md). A keyset cursor is a position in one ordering, so a sortable column would page through an order the cursor does not describe.
